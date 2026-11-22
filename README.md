@@ -127,51 +127,54 @@ Current result: **13 / 13 test cases passed, 0 wrong answers**; kill test passed
 ## Technical architecture
 
 ```mermaid
-flowchart LR
-    subgraph Browser["Browser (client's vendor desk)"]
-        SPA["React 18 SPA<br/>hash routes: / · login · run/:id · batch/:id<br/>approvals · checks · vendors · billing · checkout/:plan"]
-    end
-    subgraph Vercel["Vercel (static)"]
-        DIST["ui/dist (Vite build)"]
-        RW["rewrite /api/* to Render"]
-    end
-    subgraph Render["Render / laptop: one Python 3.11 process"]
-        MW["HTTP middleware<br/>session cookie check (401)"]
-        API["FastAPI routes<br/>/api/auth · /api/runs · /api/batches<br/>/api/actions · /api/vendor-master<br/>/api/billing · /api/plans · /api/summary"]
-        BATCH["batch.expand()<br/>LLM split of free text"]
-        RUNNER["runner.run()<br/>checkpointed step loop<br/>RunContext: budget guard, JSONL log"]
-        subgraph STEPS["pipeline.STEPS (12)"]
-            S["intake → duplicates → resolve → profile → registry → website<br/>→ ids → directors → claims → adverse → facts → decide"]
-        end
-        CL["clients/<br/>crustdata.py · registry.py · llm.py · idchecks.py<br/>retry + backoff · 429 waits x-ratelimit-reset<br/>402 stops · timeout = unavailable · response cache"]
-        EV["evidence.py<br/>make_fact + source_check"]
-        ACT["actions.py<br/>propose · decide · execute_approved<br/>outbox + reconcile"]
-        EXEC["executor thread (1.5 s loop)"]
-        BILL["billing.py<br/>plans · usage · checkout · confirm"]
-        AUTH["auth.py<br/>PBKDF2 · sessions"]
-        DB[("SQLite WAL, synchronous=FULL<br/>runs · steps · events · cache · calls<br/>actions · vendor_master · users · sessions<br/>account · billing_orders")]
-        POL[/"policy.yaml (re-read every run)"/]
-    end
-    subgraph EXT["External services"]
-        CD["Crustdata API<br/>company identify/enrich · person search/enrich<br/>web search/live · web enrich/live"]
-        MCA["MCA record mirrors<br/>InstaFinancials · Tofler · companydetails.in"]
-        IFSC["Razorpay IFSC directory"]
-        GROQ["Groq LLM"]
-        SMTP["Gmail SMTP (team allow-list)"]
-        RZP["Razorpay Checkout (test mode)"]
-    end
-    SPA --> DIST
-    SPA -- "fetch /api" --> RW --> MW --> API
-    API --> BATCH --> GROQ
-    API --> RUNNER --> STEPS --> CL
-    STEPS --> EV
-    CL --> CD & MCA & IFSC & GROQ
-    RUNNER --> ACT
-    EXEC --> ACT --> SMTP
-    API --> BILL --> RZP
+flowchart TB
+    SPA["React 18 SPA in the browser<br/>routes: home, login, run, batch, approvals,<br/>checks, vendors, billing, checkout"]
+    VER["Vercel: static ui/dist<br/>rewrite /api/* to Render"]
+    MW["Auth middleware<br/>session cookie check, 401"]
+    API["FastAPI routes<br/>auth, runs, batches, actions,<br/>vendor-master, billing, plans, summary"]
+    BATCH["batch.expand<br/>LLM split of free text"]
+    RUNNER["runner.run<br/>checkpointed step loop<br/>budget guard, JSONL log"]
+    STEPS["pipeline.STEPS, 12 steps<br/>intake, duplicates, resolve, profile,<br/>registry, website, ids, directors,<br/>claims, adverse, facts, decide"]
+    CL["clients: crustdata, registry, llm, idchecks<br/>retry and backoff, 429 waits reset header,<br/>402 stops, timeout means unavailable, cache"]
+    EV["evidence.py<br/>make_fact and source_check"]
+    ACT["actions.py<br/>propose, decide, execute_approved,<br/>outbox and reconcile"]
+    EXEC["executor thread, 1.5 s loop"]
+    BILL["billing.py<br/>plans, usage, checkout, confirm"]
+    AUTH["auth.py<br/>PBKDF2 passwords, sessions"]
+    POL["policy.yaml<br/>re-read on every run"]
+    DB[("SQLite WAL, synchronous FULL<br/>runs, steps, events, cache, calls,<br/>actions, vendor_master, users,<br/>sessions, account, billing_orders")]
+    CD["Crustdata API<br/>company identify and enrich,<br/>person search and enrich,<br/>web search and web enrich"]
+    MCA["MCA record mirrors<br/>InstaFinancials, Tofler, companydetails.in"]
+    IFSC["Razorpay IFSC directory"]
+    GROQ["Groq LLM"]
+    SMTP["Gmail SMTP, team allow-list"]
+    RZP["Razorpay Checkout, test mode"]
+
+    SPA --> VER
+    VER --> MW
+    MW --> API
     API --> AUTH
-    RUNNER & CL & ACT & BILL & AUTH <--> DB
-    POL -.-> RUNNER
+    API --> BATCH
+    BATCH --> GROQ
+    API --> RUNNER
+    POL --> RUNNER
+    RUNNER --> STEPS
+    STEPS --> CL
+    STEPS --> EV
+    CL --> CD
+    CL --> MCA
+    CL --> IFSC
+    CL --> GROQ
+    RUNNER --> ACT
+    EXEC --> ACT
+    ACT --> SMTP
+    API --> BILL
+    BILL --> RZP
+    RUNNER --> DB
+    CL --> DB
+    ACT --> DB
+    BILL --> DB
+    AUTH --> DB
 ```
 
 **Request lifecycle.** `POST /api/runs` → request protected (bank number hashed) → `batch.expand` (one or many requests) → a
