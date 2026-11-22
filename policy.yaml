@@ -1,0 +1,40 @@
+# Vetted policy: every rule, threshold and limit the service uses.
+# Requirement changes and live fixes should be made here first.
+
+limits:
+  max_seconds_per_run: 180        # hard time limit per vendor run
+  max_credits_per_run: 40         # hard Crustdata credit limit per vendor run
+  max_inr_per_run: 400            # hard cost limit per vendor run (all providers)
+
+pricing:
+  inr_per_credit: 8.5             # ASSUMPTION: ~$0.10/credit at ~Rs 85/$; confirm with Crustdata
+  groq_inr_per_1k_tokens: 0.0     # free tier during the event
+  price_per_vendor_inr: 999       # what the client pays per vendor processed
+
+matching:
+  duplicate_name_threshold: 92    # rapidfuzz token_set_ratio on normalised names
+  lookalike_name_threshold: 85    # name looks like a known company...
+  lookalike_requires_domain_mismatch: true
+  person_name_threshold: 88       # director name vs Crustdata person name
+
+activity:
+  window_days: 180                # an activity signal must be newer than this
+  min_signals_for_trading: 1      # headcount, hiring, news or live website
+
+namesake:
+  identifiers_required: 2         # name + at least one more (company, DIN, city)
+
+decision:
+  # statuses that block a vendor outright (still needs a person to confirm)
+  reject_statuses: ["strike off", "struck off", "dissolved", "under liquidation", "liquidated", "amalgamated", "dormant"]
+  refer_on_adverse_media: true
+  cannot_verify_without_registry: true
+
+output:
+  # extra fields can be appended here without code changes
+  fields: ["decision", "real_and_trading", "who_runs_it", "how_long_it_has_existed", "anything_off", "facts", "cost", "missing"]
+
+groq:
+  model: "openai/gpt-oss-120b"
+  fallback_model: "openai/gpt-oss-20b"
+  enabled: true
