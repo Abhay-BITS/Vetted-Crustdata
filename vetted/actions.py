@@ -158,11 +158,14 @@ def _perform(store: Store, a: dict) -> dict:
         if env("SMTP_HOST") and to_domain not in allowed:
             sent_via = "outbox file (recipient is not on the team allow-list, so nothing was sent)"
         elif env("SMTP_HOST"):
-            with smtplib.SMTP(env("SMTP_HOST"), int(env("SMTP_PORT", "587")), timeout=20) as s:
-                s.starttls()
-                s.login(env("SMTP_USER"), env("SMTP_PASS"))
-                s.send_message(msg)
-            sent_via = "smtp"
+            try:
+                with smtplib.SMTP(env("SMTP_HOST"), int(env("SMTP_PORT", "587")), timeout=20) as s:
+                    s.starttls()
+                    s.login(env("SMTP_USER"), env("SMTP_PASS"))
+                    s.send_message(msg)
+                sent_via = "smtp"
+            except (OSError, smtplib.SMTPException) as e:
+                sent_via = f"outbox file (SMTP not reachable from this host: {type(e).__name__}; nothing was sent)"
         # the .eml file is written last and atomically: its presence proves the email went out
         tmp = OUTBOX_DIR / f"{a['action_id']}.eml.tmp"
         tmp.write_bytes(bytes(msg))

@@ -158,6 +158,14 @@ cp .env.example .env          # add CRUSTDATA_API_KEY and (optional) GROQ_API_KE
 .venv/bin/python -m tests.kill_test           # kill -9 mid-run, restart, check each action happens once
 ```
 
+## Hosting
+
+- **Backend on Render** (`render.yaml`): `pip install -r requirements.txt`, then `uvicorn vetted.api:app --host 0.0.0.0 --port $PORT`.
+  Set the secrets from `.env.example` in the Render dashboard. On the free plan the disk is not kept between restarts, so
+  the service re-loads the fixture vendor master on start; `MAX_RUNS_PER_HOUR` caps public use.
+- **Website on Vercel** (root directory `ui`): `ui/vercel.json` forwards `/api/*` to the Render service.
+- For the live kill-and-restart demo, run the service locally (see below).
+
 UI development: `cd ui && npm install && npm run dev` (proxies `/api` to port 8000); `npm run build` refreshes `ui/dist`.
 
 ## Stop and restart

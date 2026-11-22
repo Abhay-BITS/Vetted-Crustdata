@@ -56,6 +56,11 @@ def _executor_loop() -> None:
 
 @app.on_event("startup")
 def _startup() -> None:
+    # on hosts without a lasting disk the database starts empty: load the client's fixture vendor master
+    if not store.q("SELECT 1 FROM vendor_master LIMIT 1"):
+        fx = ROOT / "tests" / "fixtures" / "vendor_master.csv"
+        if fx.exists():
+            import_vendor_master_csv(store, fx.read_text())
     for r in store.q("SELECT run_id, request_json FROM runs WHERE status='running'"):
         _start(r["run_id"], json.loads(r["request_json"]))          # resume after a kill
     threading.Thread(target=_executor_loop, daemon=True).start()
@@ -100,9 +105,13 @@ def _start_sequence(items: list[tuple[str, dict]]) -> None:
 @app.post("/api/runs")
 def create_run(req: RunRequest):
     from .batch import expand
+    from .config import env
     body = {k: v for k, v in req.model_dump().items() if v}
     if not body:
         raise HTTPException(400, "send at least a vendor name, a website or free text")
+    cap = int(env("MAX_RUNS_PER_HOUR", "0") or 0)
+    if cap and store.q("SELECT COUNT(*) n FROM runs WHERE created_at > ?", (time.time() - 3600,))[0]["n"] >= cap:
+        raise HTTPException(429, f"this demo allows {cap} checks an hour; try again shortly")
     from .privacy import protect_request
     batch_id, requests = expand(store, body)
     items = []
