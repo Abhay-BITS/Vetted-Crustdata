@@ -423,6 +423,85 @@ def step_directors(ctx: RunContext, state: dict) -> dict:
     return {"directors": rows, "claimed": claimed_check, "registry_has_directors": bool(directors)}
 
 
+# --------------------------------------------------------------------------- step 6b: adverse media
+ADVERSE_WORDS = ["fraud", "arrest", "arrested", "scam", "cheating", "cheated", "fir ", "f.i.r", "money laundering",
+                 "raid", "raided", "absconding", "default", "defaulter", "wilful", "embezzle", "forgery", "fake",
+                 "ponzi", "seized", "chargesheet", "charge sheet", "evasion", "bribe", "convicted", "booked", "held for"]
+DESIGNATION_RANK = {"managing director": 0, "whole-time director": 1, "whole time director": 1, "director": 2}
+
+
+def _contains_all_tokens(text: str, name: str) -> bool:
+    t = " " + re.sub(r"[^a-z0-9 ]", " ", text.lower()) + " "
+    toks = [w for w in re.sub(r"[^a-z0-9 ]", " ", name.lower()).split() if len(w) > 1]
+    return bool(toks) and all(f" {w} " in t for w in toks)
+
+
+def step_adverse(ctx: RunContext, state: dict) -> dict:
+    """Screen the people who run the vendor against the news; clear namesakes (2-identifier rule)."""
+    reg = state.get("registry") or {}
+    prof = state.get("profile") or {}
+    v = state["intake"]
+    need = int(ctx.policy.get("namesake", {}).get("identifiers_required", 2))
+    dirs = ((reg.get("pages") or {}).get("tofler") or {}).get("directors") or []
+    dirs = sorted(dirs, key=lambda d: DESIGNATION_RANK.get((d.get("designation") or "").lower(), 3))
+    people = [{"name": d["name"], "din": d.get("din")} for d in dirs[:3]]
+    for c in v.get("directors") or []:
+        if not any(fuzz.token_sort_ratio(c.lower(), p["name"].lower()) >= 88 for p in people):
+            people.append({"name": c, "din": None})
+    people = people[:4]
+    if not people:
+        return {"screened": [], "note": "no directors known, so no one could be screened"}
+
+    insta = (reg.get("pages") or {}).get("instafinancials") or {}
+    legal = ((insta.get("fields") or {}).get("legal_name") or {}).get("value") or v.get("vendor_name") or ""
+    addr = ((insta.get("fields") or {}).get("registered_address") or {}).get("value") or ""
+    brand_words = [w for w in brand_of(legal).split() if len(w) > 2]
+    cities = [c for c in {prof.get("city"), v.get("city")} if c]
+    for part in addr.split(",")[-3:]:
+        part = re.sub(r"\d+", "", part).strip()
+        if part and part.lower() not in ("india", "na") and len(part) > 2:
+            cities.append(part)
+
+    cd = CrustdataClient(ctx)
+    screened = []
+    for p in people:
+        r = cd.web_search(f"{p['name']} fraud arrested scam", sources=["news"])
+        entry = {"name": p["name"], "din": p.get("din"), "searched": r.outcome, "results": 0,
+                 "confirmed": [], "namesakes_cleared": [], "retrieved_at": r.retrieved_at}
+        if not r.ok:
+            entry["note"] = "news source did not respond; not screened (this is not a clean result)"
+            screened.append(entry)
+            continue
+        results = (r.data or {}).get("results", []) if isinstance(r.data, dict) else []
+        entry["results"] = len(results)
+        for item in results:
+            text = f"{item.get('title','')}. {item.get('snippet','')}"
+            low = text.lower()
+            if not _contains_all_tokens(text, p["name"]):
+                continue
+            if not any(w in low for w in ADVERSE_WORDS):
+                continue
+            ids = ["name"]
+            if brand_words and all(w in low for w in brand_words):
+                ids.append(f"company ({legal})")
+            if p.get("din") and p["din"] in text:
+                ids.append(f"DIN {p['din']}")
+            for c in cities:
+                if c.lower() in low:
+                    ids.append(f"city ({c})")
+                    break
+            hit = {"title": item.get("title"), "snippet": item.get("snippet"), "url": item.get("url"),
+                   "identifiers": ids}
+            if len(ids) >= need:
+                entry["confirmed"].append(hit)
+            else:
+                hit["why_cleared"] = (f"The article names {p['name']} but not {legal}, the DIN or the company's city, "
+                                      f"so it is treated as a namesake")
+                entry["namesakes_cleared"].append(hit)
+        screened.append(entry)
+    return {"screened": screened, "identifiers_required": need}
+
+
 # --------------------------------------------------------------------------- step 7: facts
 def step_facts(ctx: RunContext, state: dict) -> dict:
     """Turn everything gathered into cited facts and run the source check on each."""
@@ -481,6 +560,20 @@ def step_facts(ctx: RunContext, state: dict) -> dict:
                                        locator=f"people.{m['group']} (person id {m.get('person_id')})",
                                        passage=f"name: {m['name']}; current_title: {m.get('title')}; current employers: {', '.join(m.get('current_employers') or [])}",
                                        record_date=(m.get("updated_at") or "")[:10] or None, retrieved_at=ret))
+    for s in (state.get("adverse") or {}).get("screened", []):
+        for hit in s.get("confirmed", []):
+            facts.append(make_fact(subject=s["name"], field="adverse_media", value=s["name"],
+                                   source="news (Crustdata /web/search/live, news source)", url=hit["url"],
+                                   locator="news result title and snippet",
+                                   passage=f"{hit['title']}. {hit['snippet']}",
+                                   note="matched on: " + ", ".join(hit["identifiers"]),
+                                   retrieved_at=s.get("retrieved_at")))
+        for hit in s.get("namesakes_cleared", [])[:2]:
+            facts.append(make_fact(subject=s["name"], field="namesake_cleared", value=s["name"],
+                                   source="news (Crustdata /web/search/live, news source)", url=hit["url"],
+                                   locator="news result title and snippet",
+                                   passage=f"{hit['title']}. {hit['snippet']}", note=hit["why_cleared"],
+                                   retrieved_at=s.get("retrieved_at")))
     if web.get("live"):
         facts.append(make_fact(subject=subject, field="website_live", value=True, source="Crustdata /web/enrich/live",
                                url=web["url"], locator="page title", passage=f"HTTP fetch succeeded; title: {web.get('title')}",
@@ -538,6 +631,21 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     for c in dirs.get("claimed") or []:
         if c["on_registry"] is False:
             flags.append(f"Claimed director {c['name']} is not on the registry record")
+    adverse_confirmed = []
+    for s in (state.get("adverse") or {}).get("screened", []):
+        for hit in s.get("confirmed", []):
+            adverse_confirmed.append(s["name"])
+            flags.append(f"Adverse news names director {s['name']} together with "
+                         f"{', '.join(i for i in hit['identifiers'] if i != 'name')}: \"{hit['title']}\"")
+        if s.get("namesakes_cleared"):
+            notes.append(f"{len(s['namesakes_cleared'])} adverse article(s) about a different {s['name']} were "
+                         f"cleared as namesakes (no second identifier)")
+        if s.get("searched") != "ok":
+            missing.append(f"news screening for {s['name']} (news source did not respond)")
+    scr = (state.get("adverse") or {}).get("screened", [])
+    if scr and not adverse_confirmed and all(x.get("searched") == "ok" for x in scr):
+        notes.append(f"Adverse-media screen: {len(scr)} director(s) searched in the news ({', '.join(x['name'] for x in scr)}); "
+                     f"nothing adverse found that names the director together with the company")
     if prof.get("found") and v.get("domain") and prof.get("domain") and v["domain"] != prof["domain"]:
         flags.append(f"Supplied website {v['domain']} differs from the company's primary domain {prof['domain']}")
 
@@ -566,7 +674,7 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     elif status and status.lower() in reject_statuses:
         decision = "REJECTED"
         reasons.append(f"Registry status is '{status}'")
-    elif res.get("lookalike") or dup.get("shared_bank"):
+    elif res.get("lookalike") or dup.get("shared_bank") or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
         decision = "REFER"
         reasons.append("Red flags need a person: " + "; ".join(flags))
     elif not reg.get("cin") and pol["decision"]["cannot_verify_without_registry"]:
@@ -620,6 +728,7 @@ STEPS = [
     ("registry", step_registry),
     ("website", step_website),
     ("directors", step_directors),
+    ("adverse", step_adverse),
     ("facts", step_facts),
     ("decide", step_decide),
 ]
