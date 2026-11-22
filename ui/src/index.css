@@ -127,3 +127,16 @@ html, body { overflow-x: clip; }
 .vt-puff { animation: vt-puff 2.7s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes vt-puff { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate(10px, -26px) scale(2.2); } }
 @media (prefers-reduced-motion: reduce) { .vt-leg, .vt-arm, .vt-wing, .vt-lift, .vt-puff { animation: none; } }
+
+/* hero sky and side vignettes */
+.vt-cloud { position: absolute; left: 0; animation: vt-cloud var(--dur) linear var(--delay) infinite; will-change: transform; }
+@keyframes vt-cloud { from { transform: translateX(-220px); } to { transform: translateX(calc(100vw + 40px)); } }
+.vt-plane { position: absolute; left: 0; animation: vt-plane 46s linear -12s infinite; will-change: transform; }
+@keyframes vt-plane { 0% { transform: translateX(-140px); } 55%, 100% { transform: translateX(calc(100vw + 200px)); } }
+.vt-scan { animation: vt-scan 7s ease-in-out infinite; }
+@keyframes vt-scan { 0% { transform: translate(-30px, -26px); } 25% { transform: translate(20px, -26px); } 50% { transform: translate(-24px, 12px); } 75% { transform: translate(26px, 30px); } 100% { transform: translate(-30px, -26px); } }
+.vt-draw { stroke-dasharray: 24; stroke-dashoffset: 24; animation: vt-draw .45s ease-out forwards; }
+@keyframes vt-draw { to { stroke-dashoffset: 0; } }
+.bob-slow { animation: bob-slow 5s ease-in-out infinite alternate; }
+@keyframes bob-slow { from { transform: translateY(0) rotate(-1.5deg); } to { transform: translateY(-8px) rotate(1deg); } }
+@media (prefers-reduced-motion: reduce) { .vt-cloud, .vt-plane, .vt-scan, .bob-slow { animation: none; } .vt-plane { display: none; } .vt-draw { stroke-dashoffset: 0; animation: none; } }

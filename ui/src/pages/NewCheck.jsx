@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowDownRight, ArrowRight, ChevronDown, ShieldCheck } from 'lucide-react'
 import { api } from '../api'
 import Frieze from '../Frieze'
+import { Checklist, Scanner, Sky } from '../HeroArt'
 import { useReveal, scrollToId } from '../motion'
 import { check, isWarning } from '../validate'
 import { DecisionBadge, DECISIONS, Section, inr } from '../ui'
@@ -36,8 +37,16 @@ export default function NewCheck() {
   return (
     <div ref={ref}>
       {/* hero: fills the first screen, the quay along its bottom */}
-      <div className="min-h-[calc(100svh-7rem)] md:min-h-[calc(100svh-8rem)] flex flex-col">
-        <Section enter titleAs="h1" className="w-full pt-6 md:pt-10" lead="For 3PL vendor desks," leadRest="see who a new carrier really is before the first rupee moves."
+      <div className="relative min-h-[calc(100svh-7rem)] md:min-h-[calc(100svh-8rem)] flex flex-col">
+        {/* hand-drawn extras in the empty space: same style as the quay */}
+        <div className="absolute inset-x-0 top-[44%] bottom-[180px] md:bottom-[220px] enter enter-5"><Sky /></div>
+        <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
+          <div className="wrap relative h-full">
+            <div className="absolute left-5 md:left-8 top-[150px] w-[180px] xl:w-[200px] enter enter-4"><Scanner /></div>
+            <div className="absolute right-5 md:right-8 top-[0px] w-[210px] xl:w-[230px] enter enter-3"><Checklist /></div>
+          </div>
+        </div>
+        <Section enter titleAs="h1" className="relative z-10 w-full pt-6 md:pt-10" lead="For 3PL vendor desks," leadRest="see who a new carrier really is before the first rupee moves."
                  title="Vendor and carrier clearance, with a source for every fact"
                  body="Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.">
           <div className="md:grid md:grid-cols-12 gap-x-8">
