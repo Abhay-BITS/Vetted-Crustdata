@@ -13,8 +13,10 @@ export const api = {
   run: (id) => req(`/api/runs/${id}`),
   ledger: (id) => req(`/api/runs/${id}/ledger`),
   actions: (status) => req(`/api/actions${status ? `?status=${status}` : ''}`),
-  decide: (id, verdict, approver, reason) =>
-    req(`/api/actions/${id}/${verdict}`, { method: 'POST', body: JSON.stringify({ approver, reason }) }),
+  decide: (id, verdict, approver, reason, pin) =>
+    req(`/api/actions/${id}/${verdict}`, { method: 'POST', body: JSON.stringify({ approver, reason, pin }) }),
+  approvers: () => req('/api/approvers'),
+  log: (id) => req(`/api/runs/${id}/log`),
   vendors: () => req('/api/vendor-master'),
   importVendors: async (file) => {
     const fd = new FormData(); fd.append('file', file)

@@ -48,6 +48,7 @@ def main(argv=None) -> int:
     ap.add_argument("verdict", choices=["approve", "hold", "block"])
     ap.add_argument("--approver", required=True)
     ap.add_argument("--reason", default="")
+    ap.add_argument("--pin", default="")
     sub.add_parser("execute")
     rz = sub.add_parser("reset")
     rz.add_argument("--all", action="store_true", help="also clear the response cache")
@@ -93,6 +94,14 @@ def main(argv=None) -> int:
         if args.cmd == "actions":
             out = act.list_actions(st, status=args.status)
         elif args.cmd == "decide":
+            from .api import _approvers
+            known = _approvers()
+            if known and known.get(args.approver) != args.pin:
+                print("approver not known or wrong PIN", file=sys.stderr)
+                return 1
+            if args.verdict == "block" and not args.reason:
+                print("give a --reason for blocking", file=sys.stderr)
+                return 1
             out = act.decide_action(st, args.action_id, args.verdict, args.approver, args.reason)
         elif args.cmd == "execute":
             out = act.execute_approved(st)

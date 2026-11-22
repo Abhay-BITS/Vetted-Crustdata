@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import ActionCard, { useApprover } from '../ActionCard'
+import ActionCard, { useApprover, ApproverPicker } from '../ActionCard'
 import { Mail, Building2 } from 'lucide-react'
 import { DecisionBadge, Section, StatusPill, prettyName, when } from '../ui'
 import { ApprovalsScene } from '../scenes'
@@ -40,10 +40,11 @@ export default function Approvals() {
       <div className="vt-bleed mt-10 enter enter-5"><ApprovalsScene /></div>
       <div className="md:grid md:grid-cols-12 gap-x-8 mt-12">
         <div className="md:col-start-5 md:col-span-8">
-          <label className="flex items-center gap-3 max-w-md enter enter-4">
-            <span className="text-sm font-medium whitespace-nowrap">Approver</span>
-            <input className="field" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name, recorded with every decision" aria-label="Approver name" />
-          </label>
+          <div className="enter enter-4">
+            <p className="text-sm font-medium mb-2">Sign in as an approver</p>
+            <ApproverPicker approver={approver} setApprover={setApprover} />
+            <p className="text-xs text-muted mt-2">Only named approvers can decide. The PIN is checked on the server and every decision is recorded.</p>
+          </div>
           <div className="mt-6 space-y-3 stagger">
             {items === null ? <p className="text-muted">Loading</p> : items.length === 0 ? (
               <div className="panel p-10 text-center text-muted">No actions are waiting. Run a check to create one.</div>

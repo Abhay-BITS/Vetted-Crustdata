@@ -16,9 +16,27 @@ from vetted.runner import run
 from vetted.store import Store
 
 
+def isolated_store() -> Store:
+    """A copy of the main database (so the response cache is reused) with the demo's runs, actions and
+    approved vendors removed: the evaluation always starts from the client's fixture vendor master."""
+    import shutil
+    import sqlite3
+    from vetted.config import DB_PATH
+    eval_db = DB_PATH.parent / "eval.db"
+    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(eval_db)
+    src.backup(dst)
+    src.close()
+    dst.close()
+    st = Store(eval_db)
+    st.reset_demo(keep_cache=True)
+    st.x("DELETE FROM vendor_master")
+    return st
+
+
 def main() -> None:
     path = sys.argv[1] if len(sys.argv) > 1 else str(ROOT / "tests" / "cases.json")
-    st = Store()
+    st = isolated_store()
     import_vendor_master_csv(st, open(ROOT / "tests" / "fixtures" / "vendor_master.csv").read())
     cases = json.load(open(path))
     passed, wrong, rows, inr, credits = 0, 0, [], 0.0, 0.0

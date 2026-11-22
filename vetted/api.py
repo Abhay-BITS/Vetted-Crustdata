@@ -163,6 +163,37 @@ def run_markdown(run_id: str):
     return JSONResponse({"markdown": to_markdown(rec["result"])})
 
 
+@app.get("/api/runs/{run_id}/log")
+def run_log(run_id: str):
+    from .config import LOG_DIR
+    f = LOG_DIR / f"{run_id}.jsonl"
+    if not f.exists():
+        return {"lines": []}
+    lines = []
+    for ln in f.read_text().splitlines():
+        try:
+            lines.append(json.loads(ln))
+        except Exception:
+            pass
+    return {"lines": lines}
+
+
+@app.get("/api/runs/{run_id}/evidence")
+def run_evidence(run_id: str, fmt: str = "md"):
+    from fastapi.responses import HTMLResponse, PlainTextResponse
+    from .evidence_file import evidence_html, evidence_markdown
+    rec = store.get_run(run_id)
+    if not rec or not rec.get("result"):
+        raise HTTPException(404, "no result yet")
+    acts = act.list_actions(store, run_id=run_id)
+    ledger = store.calls_for(run_id)
+    if fmt == "html":
+        return HTMLResponse(evidence_html(rec, acts, ledger))
+    name = (rec["result"].get("vendor") or run_id).replace(" ", "-")
+    return PlainTextResponse(evidence_markdown(rec, acts, ledger), media_type="text/markdown",
+                             headers={"Content-Disposition": f'attachment; filename="vetted-evidence-{name}-{run_id}.md"'})
+
+
 @app.get("/api/runs/{run_id}/ledger")
 def run_ledger(run_id: str):
     return {"summary": store.run_cost(run_id), "calls": store.calls_for(run_id)}
@@ -171,7 +202,23 @@ def run_ledger(run_id: str):
 # --------------------------------------------------------------------------- approvals
 class Verdict(BaseModel):
     approver: str
+    pin: str = ""
     reason: str = ""
+
+
+def _approvers() -> dict[str, str]:
+    from .config import env
+    out = {}
+    for part in (env("APPROVERS") or "").split(","):
+        if ":" in part:
+            name, pin = part.rsplit(":", 1)
+            out[name.strip()] = pin.strip()
+    return out
+
+
+@app.get("/api/approvers")
+def approvers():
+    return {"approvers": list(_approvers().keys())}
 
 
 @app.get("/api/actions")
@@ -185,6 +232,12 @@ def decide(action_id: str, verdict: str, v: Verdict):
         raise HTTPException(400, "verdict must be approve, hold or block")
     if not v.approver.strip():
         raise HTTPException(400, "a named approver is required")
+    known = _approvers()
+    if known:
+        if v.approver.strip() not in known:
+            raise HTTPException(403, "this person is not an approver")
+        if v.pin.strip() != known[v.approver.strip()]:
+            raise HTTPException(403, "wrong PIN for this approver")
     if verdict == "block" and not v.reason.strip():
         raise HTTPException(400, "give a reason for blocking; the vendor is told why")
     a = act.decide_action(store, action_id, verdict, v.approver.strip(), v.reason)

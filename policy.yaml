@@ -47,6 +47,10 @@ output:
   # extra fields can be appended here without code changes
   fields: ["decision", "real_and_trading", "who_runs_it", "how_long_it_has_existed", "anything_off", "facts", "cost", "missing", "personal_data"]
 
+email:
+  # agents only write to the team: anything else is saved as a file, never sent
+  allow_domains: ["pilani.bits-pilani.ac.in"]
+
 groq:
   model: "openai/gpt-oss-120b"
   fallback_model: "openai/gpt-oss-20b"

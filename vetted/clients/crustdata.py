@@ -143,6 +143,14 @@ class CrustdataClient:
     def web_fetch(self, urls: list[str]) -> ApiResult:
         return self.post("/web/enrich/live", {"urls": urls[:10]})
 
+    def person_enrich(self, profile_urls: list[str]) -> ApiResult:
+        return self.post("/person/enrich", {"professional_network_profile_urls": profile_urls[:25]})
+
+    def person_at_company(self, name: str, company_id: int) -> ApiResult:
+        return self.person_search({"op": "and", "conditions": [
+            {"field": "basic_profile.name", "type": "(.)", "value": name},
+            {"field": "experience.employment_details.current.company_id", "type": "=", "value": company_id}]}, limit=2)
+
     def person_search(self, filters: dict, limit: int = 5, fields: list[str] | None = None) -> ApiResult:
         body: dict = {"filters": filters, "limit": limit}
         if fields:

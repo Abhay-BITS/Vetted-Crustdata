@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Check, Loader2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Check, Loader2, ArrowUpRight, ArrowDownRight, FileDown, Printer, ScrollText } from 'lucide-react'
 import { api } from '../api'
-import ActionCard, { useApprover } from '../ActionCard'
+import ActionCard, { useApprover, ApproverPicker } from '../ActionCard'
 import { DecisionBadge, DECISIONS, inr } from '../ui'
 import { RunScene } from '../scenes'
 import { useCountUp } from '../motion'
@@ -23,6 +23,7 @@ export default function RunView({ runId }) {
   const [run, setRun] = useState(null)
   const [ledger, setLedger] = useState(null)
   const [showLedger, setShowLedger] = useState(false)
+  const [log, setLog] = useState(null)
   const [approver, setApprover] = useApprover()
   const [err, setErr] = useState('')
 
@@ -97,6 +98,27 @@ export default function RunView({ runId }) {
             <p className="body-lg mt-3 enter enter-2" aria-live="polite"><span className="shimmer">Checking the registry, staff, hiring and news.</span> Each step is saved, so a restart picks up where it stopped.</p>
           )}
 
+          {r && (
+            <div className="flex flex-wrap gap-2 mt-8">
+              <a className="btn-dark" href={`/api/runs/${runId}/evidence`}><FileDown size={16} aria-hidden="true" />Download evidence file</a>
+              <a className="btn-soft" href={`/api/runs/${runId}/evidence?fmt=html&print=1`} target="_blank" rel="noreferrer"><Printer size={16} aria-hidden="true" />Print as PDF</a>
+              <button className="btn-soft" onClick={() => log ? setLog(null) : api.log(runId).then(setLog)}><ScrollText size={16} aria-hidden="true" />{log ? 'Hide the log' : 'Show the log'}</button>
+            </div>
+          )}
+
+          {log && (
+            <section className="frame mt-4 p-4 max-h-80 overflow-auto pop" aria-label="Run log" data-lenis-prevent>
+              <ol className="mono text-[12px] space-y-1">
+                {log.lines.map((l, i) => (
+                  <li key={i} className="grid grid-cols-[72px_90px_1fr] gap-3">
+                    <span className="text-muted">{(l.ts || '').slice(11)}</span><span>{l.step}</span>
+                    <span className="truncate" title={JSON.stringify(l)}>{l.event}{l.reason ? `: ${l.reason}` : ''}{l.seconds != null ? ` (${l.seconds}s)` : ''}{l.wait_s ? ` wait ${l.wait_s}s` : ''}{l.endpoint ? ` ${l.endpoint}` : ''}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
           {showLedger && ledger && (
             <section className="frame mt-10 overflow-x-auto pop" aria-label="Call ledger" data-lenis-prevent>
               <table className="w-full text-sm">
@@ -121,12 +143,22 @@ export default function RunView({ runId }) {
             <section className="mt-14" aria-labelledby="actions-h">
               <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
                 <h2 id="actions-h" className="h-sec !text-[28px]">Waiting for a person</h2>
-                <label className="text-sm flex items-center gap-2">
-                  <span className="text-muted">Approver</span>
-                  <input className="field !h-10 w-48" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name" aria-label="Approver name" />
-                </label>
+                <ApproverPicker approver={approver} setApprover={setApprover} />
               </div>
               <div className="space-y-3 stagger">{run.actions.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} />)}</div>
+            </section>
+          )}
+
+          {(run.actions?.some(a => a.approver) || run.events?.length > 0) && (
+            <section className="mt-12" aria-labelledby="audit-h">
+              <h2 id="audit-h" className="text-xl mb-3">Audit trail</h2>
+              <ol className="border-l border-line pl-5 space-y-3 text-sm stagger">
+                <li><span className="mono text-muted">{new Date(run.created_at * 1000).toLocaleTimeString('en-IN')}</span> Check requested</li>
+                {(run.events || []).map((e, i) => <li key={'e' + i}><span className="mono text-muted">{new Date(e.ts * 1000).toLocaleTimeString('en-IN')}</span> Service restarted; resumed from step {e.from_step}</li>)}
+                {run.actions.filter(a => a.approver).map(a => (
+                  <li key={a.action_id}><span className="mono text-muted">{new Date(a.updated_at * 1000).toLocaleTimeString('en-IN')}</span> {a.approver} chose <b className="font-medium">{a.status === 'blocked' ? 'block' : a.status === 'held' ? 'hold' : 'approve'}</b> on “{a.kind.replace('_', ' ')}”{a.reason ? `, reason: ${a.reason}` : ''}{a.status === 'done' ? `; executed ${a.executed_count} time${a.executed_count === 1 ? '' : 's'}` : ''}{a.result?.via ? ` (${a.result.via})` : ''}</li>
+                ))}
+              </ol>
             </section>
           )}
         </div>

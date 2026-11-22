@@ -454,6 +454,52 @@ def step_directors(ctx: RunContext, state: dict) -> dict:
         confirmed = bool(best and score >= th)
         rows.append({**d, "crustdata_match": best if confirmed else None, "match_score": score,
                      "confirmed_at_company": confirmed})
+    # Confirm the people who run it with Crustdata Person Search (+ Person Enrich for the top director):
+    # is the director's CURRENT role at this company?
+    cid = prof.get("company_id")
+    if cid and rows:
+        cd = CrustdataClient(ctx)
+        ranked = sorted(range(len(rows)), key=lambda i: DESIGNATION_RANK.get((rows[i].get("designation") or "").lower(), 3))
+        looked = 0
+        for i in ranked:
+            if looked >= 2:
+                break
+            d = rows[i]
+            looked += 1
+            r = cd.person_at_company(d["name"], cid)
+            profs = (r.data or {}).get("profiles", []) if r.ok and isinstance(r.data, dict) else []
+            best = None
+            for p_ in profs:
+                nm = (p_.get("basic_profile") or {}).get("name") or ""
+                if fuzz.token_sort_ratio(nm.lower(), d["name"].lower()) >= th or fuzz.token_set_ratio(nm.lower(), d["name"].lower()) >= 95:
+                    best = p_
+                    break
+            if not best:
+                d["person_search"] = "not found at the company" if r.ok else f"source {r.outcome}"
+                continue
+            cur = [e for e in ((best.get("experience") or {}).get("employment_details") or {}).get("current", [])
+                   if e.get("crustdata_company_id") == cid]
+            role = cur[0] if cur else {}
+            url = ((best.get("social_handles") or {}).get("professional_network_identifier") or {}).get("profile_url")
+            d["confirmed_at_company"] = True
+            d["person"] = {"name": (best.get("basic_profile") or {}).get("name"), "title": role.get("title"),
+                           "employer": role.get("name"), "start_date": (role.get("start_date") or "")[:10],
+                           "profile_url": url, "retrieved_at": r.retrieved_at}
+        # Person Enrich on the top confirmed director for the profile's own record date
+        top = next((rows[i] for i in ranked if rows[i].get("person", {}).get("profile_url")), None)
+        if top:
+            e = cd.person_enrich([top["person"]["profile_url"]])
+            try:
+                pdata = e.data[0]["matches"][0]["person_data"] if e.ok and isinstance(e.data, list) else None
+            except (KeyError, IndexError, TypeError):
+                pdata = None
+            if pdata is None and e.ok and isinstance(e.data, list) and e.data:
+                pdata = e.data[0].get("person_data") or (e.data[0].get("matches") or [{}])[0].get("person_data")
+            if pdata:
+                bp = pdata.get("basic_profile") or {}
+                top["person"]["record_date"] = (bp.get("last_updated") or pdata.get("updated_at") or "")[:10] or None
+                top["person"]["enriched"] = True
+
     claimed_check = []
     for c in claimed:
         on_record = any(fuzz.token_sort_ratio(c.lower(), d["name"].lower()) >= th for d in directors)
@@ -591,6 +637,15 @@ def step_facts(ctx: RunContext, state: dict) -> dict:
                                    url=n["article_url"], locator="article title", passage=n["article_title"],
                                    record_date=n["article_publish_date"], retrieved_at=ret))
         for d in dirs.get("directors") or []:
+            pp = d.get("person")
+            if pp and pp.get("title"):
+                facts.append(make_fact(subject=d["name"], field="current_role", value=pp["title"],
+                                       source="Crustdata /person/search" + (" + /person/enrich" if pp.get("enriched") else ""),
+                                       url=pp.get("profile_url") or "https://api.crustdata.com/person/search",
+                                       locator="experience.employment_details.current",
+                                       passage=f"name: {pp['name']}; current employer: {pp['employer']}; title: {pp['title']}; start_date: {pp['start_date']}",
+                                       record_date=pp.get("record_date"), retrieved_at=pp.get("retrieved_at")))
+                continue
             m = d.get("crustdata_match")
             if m:
                 facts.append(make_fact(subject=d["name"], field="current_role", value=m.get("title") or "",
@@ -762,8 +817,14 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
         real = "Registered and showing activity, but needs review"
     else:
         real = "Registered, but no evidence of trading"
-    who = [f"{d['name']} ({d['designation']}, DIN {d['din']})" + (" — confirmed at the company" if d["confirmed_at_company"] else "")
-           for d in reg_dirs] or (["Cannot verify: no director record found"])
+    def who_line(d):
+        base = f"{d['name']} ({d['designation']}, DIN {d['din']})"
+        pp = d.get("person")
+        if pp and pp.get("title"):
+            since = f" since {pp['start_date'][:7]}" if pp.get("start_date") else ""
+            return f"{base}: {pp['title']} at the company{since}, confirmed"
+        return base + (": confirmed at the company" if d["confirmed_at_company"] else "")
+    who = [who_line(d) for d in reg_dirs] or ["Cannot verify: no director record found"]
     if inc:
         d = parse_date(inc)
         age = f" (about {days_ago(d) // 365} years)" if d else ""

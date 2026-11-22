@@ -1,12 +1,35 @@
-import { useState } from 'react'
-import { Check, Pause, Ban } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Pause, Ban, Lock } from 'lucide-react'
 import { api } from './api'
 import { ACTION_LABEL, StatusPill, when } from './ui'
+
+let _pin = ''  // kept in memory only, never stored
 
 export function useApprover() {
   const [name, setName] = useState(localStorage.getItem('vetted.approver') || '')
   const save = v => { setName(v); localStorage.setItem('vetted.approver', v) }
   return [name, save]
+}
+
+/** Approver sign-in: pick a named approver and enter their PIN. */
+export function ApproverPicker({ approver, setApprover }) {
+  const [list, setList] = useState([])
+  const [pin, setPin] = useState(_pin)
+  useEffect(() => { api.approvers().then(d => { setList(d.approvers); if (!d.approvers.includes(approver) && d.approvers.length) setApprover(d.approvers[0]) }).catch(() => {}) }, [])
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="sr-only" htmlFor="approver-sel">Approver</label>
+      <select id="approver-sel" className="field !h-10 !w-auto pr-8" value={approver} onChange={e => setApprover(e.target.value)}>
+        {list.map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+      <label className="relative">
+        <span className="sr-only">PIN</span>
+        <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+        <input type="password" inputMode="numeric" className="field !h-10 !w-28 pl-8 font-mono" placeholder="PIN" value={pin}
+               onChange={e => { setPin(e.target.value); _pin = e.target.value }} aria-label="Approver PIN" />
+      </label>
+    </div>
+  )
 }
 
 export default function ActionCard({ action, approver, onChange, context }) {
@@ -19,10 +42,11 @@ export default function ActionCard({ action, approver, onChange, context }) {
 
   async function decide(verdict) {
     setErr('')
-    if (!approver.trim()) { setErr('Type your name as the approver first.'); return }
+    if (!approver.trim()) { setErr('Pick the approver first.'); return }
+    if (!_pin) { setErr('Enter the approver PIN first.'); return }
     if (verdict === 'block' && !reason.trim()) { setBlocking(true); setErr('Say why you are blocking it. The vendor is told the reason.'); return }
     setBusy(verdict)
-    try { await api.decide(action.action_id, verdict, approver, verdict === 'block' ? reason : ''); setBlocking(false); onChange && onChange() }
+    try { await api.decide(action.action_id, verdict, approver, verdict === 'block' ? reason : '', _pin); setBlocking(false); onChange && onChange() }
     catch (e) { setErr(e.message) } finally { setBusy('') }
   }
 

@@ -135,8 +135,13 @@ def _perform(store: Store, a: dict) -> dict:
         msg["Message-ID"] = f"<{a['action_id']}@vetted>"
         msg.set_content(p["body"])
         sent_via = "outbox file"
-        if env("SMTP_HOST"):
-            with smtplib.SMTP(env("SMTP_HOST"), int(env("SMTP_PORT", "587"))) as s:
+        from .config import load_policy
+        allowed = [d.lower() for d in load_policy().get("email", {}).get("allow_domains", [])]
+        to_domain = (p["to"].split("@")[-1] or "").lower()
+        if env("SMTP_HOST") and to_domain not in allowed:
+            sent_via = "outbox file (recipient is not on the team allow-list, so nothing was sent)"
+        elif env("SMTP_HOST"):
+            with smtplib.SMTP(env("SMTP_HOST"), int(env("SMTP_PORT", "587")), timeout=20) as s:
                 s.starttls()
                 s.login(env("SMTP_USER"), env("SMTP_PASS"))
                 s.send_message(msg)

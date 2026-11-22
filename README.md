@@ -72,6 +72,12 @@ Every fact carries its **source link, the exact passage or API field, the record
 
 A fact whose value does not appear in its own quoted passage is dropped by the source check and cannot support a decision.
 
+## Evidence file
+
+Every check can be downloaded as an evidence file (`GET /api/runs/{id}/evidence`, Markdown) or printed as a PDF
+(`?fmt=html&print=1`): the decision, the four answers, every fact with its source, passage and dates, the personal data used,
+the approvals with approver and reason, restarts, and the full cost ledger. The run log is at `GET /api/runs/{id}/log`.
+
 ## Pass mark
 
 - **0 wrong clearances.** A vendor is never `CLEARED` without an Active registry record tied to it by a second identifier
@@ -89,6 +95,7 @@ Current result on `tests/cases.json`: **13 / 13 passed, 0 wrong answers.**
 |---|---|
 | Crustdata `POST /company/identify` | Resolve the name and the website to a company; lookalike candidates |
 | Crustdata `POST /company/enrich` | Headcount (dated), hiring, news, founders/CXOs with current roles |
+| Crustdata `POST /person/search` + `POST /person/enrich` | Is each top director's current role at this company? (title and start date) |
 | Crustdata `POST /web/search/live` | Find the CIN; news search for adverse media on each director |
 | Crustdata `POST /web/enrich/live` | Check the vendor's website is live |
 | MCA company records via InstaFinancials (public pages) | Legal name, CIN, status, incorporation date, registered address, website, record date |
@@ -131,7 +138,7 @@ cp .env.example .env          # add CRUSTDATA_API_KEY and (optional) GROQ_API_KE
 .venv/bin/python -m vetted run --text "Please clear TCI Express Limited, tciexpress.in"
 .venv/bin/python -m vetted resume <run_id>
 .venv/bin/python -m vetted actions --status pending_approval
-.venv/bin/python -m vetted decide <action_id> approve --approver "Your Name"
+.venv/bin/python -m vetted decide <action_id> approve --approver "Your Name" --pin 1234
 .venv/bin/python -m vetted execute
 .venv/bin/python -m vetted import-master clients_vendor_master.csv
 .venv/bin/python -m vetted run --file batch.json        # {"vendors": [...]}
@@ -139,7 +146,7 @@ cp .env.example .env          # add CRUSTDATA_API_KEY and (optional) GROQ_API_KE
 .venv/bin/python -m vetted reset                         # clear demo runs and actions (keeps the cache)
 
 # tests
-.venv/bin/python -m tests.evaluate            # pass rate on tests/cases.json
+.venv/bin/python -m tests.evaluate            # pass rate on tests/cases.json (runs on an isolated copy of the database)
 .venv/bin/python -m tests.kill_test           # kill -9 mid-run, restart, check each action happens once
 ```
 
@@ -168,6 +175,10 @@ UI development: `cd ui && npm install && npm run dev` (proxies `/api` to port 80
 - Every report carries a **Personal data used** record: each name and DIN, where it came from, why it was used, and
   that it is deleted after `privacy.retention_days` (30). `python -m vetted purge` enforces it.
 - Blocking an action needs a written reason, which is recorded and shared with the vendor.
+- **Only named approvers can decide.** Approvers and their PINs live in `.env` (`APPROVERS="Name:PIN,..."`); the PIN is
+  checked on the server and every verdict is recorded with the approver's name, time and reason (the **Audit trail**).
+- **Agents write only to the team.** Email is sent through SMTP only to addresses on `policy.yaml` → `email.allow_domains`;
+  anything else is saved as a file and never sent.
 
 ## Requirement changes
 

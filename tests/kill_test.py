@@ -69,8 +69,10 @@ def main():
     print("paid calls repeated after restart:", len(paid))
 
     acts = httpx.get(f"{BASE}/api/runs/{rid}").json()["actions"]
+    from vetted.api import _approvers
+    name, pin = next(iter(_approvers().items()), ("kill-test", ""))
     for a in acts:
-        httpx.post(f"{BASE}/api/actions/{a['action_id']}/approve", json={"approver": "kill-test", "reason": "test"})
+        httpx.post(f"{BASE}/api/actions/{a['action_id']}/approve", json={"approver": name, "pin": pin, "reason": "kill test"})
     time.sleep(4)
 
     # simulate a crash after the effect happened but before the status was recorded
