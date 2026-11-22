@@ -55,17 +55,17 @@ export default function App() {
         <div className="wrap flex items-center justify-between gap-3 pt-2.5">
           <a href="#/" className={`pointer-events-auto flex items-center gap-2.5 rounded p-1 pr-3.5 bg-soft transition-shadow ${scrolled ? 'shadow-float' : ''}`} aria-label="Vetted, home">
             <span className="w-8 h-8 rounded-[8px] bg-card grid place-items-center text-ink shadow-[0_1px_2px_oklch(0.289_0_0/.08)]"><Mark size={20} /></span>
-            <span className="text-sm font-medium">Vetted</span>
+            <span className="text-sm lg:text-[15px] font-medium">Vetted</span>
           </a>
           <nav aria-label="Main" className={`pointer-events-auto flex items-center gap-0.5 rounded p-1 bg-soft overflow-x-auto transition-shadow ${scrolled ? 'shadow-float' : ''}`}>
             {nav.map(n => (
               <a key={n.key} href={n.href} aria-current={active === n.key ? 'page' : undefined}
-                 className={`relative flex items-center gap-1.5 h-9 px-3 rounded-[8px] text-sm whitespace-nowrap transition-colors ${active === n.key ? 'bg-card text-ink font-medium shadow-[0_1px_2px_oklch(0.289_0_0/.06)]' : 'text-ink hover:bg-line'}`}>
+                 className={`relative flex items-center gap-1.5 h-9 lg:h-10 px-3 lg:px-3.5 rounded-[8px] text-sm lg:text-[15px] whitespace-nowrap transition-colors ${active === n.key ? 'bg-card text-ink font-medium shadow-[0_1px_2px_oklch(0.289_0_0/.06)]' : 'text-ink hover:bg-line'}`}>
                 {n.short ? <><span className="hidden sm:inline">{n.label}</span><span className="sm:hidden">{n.short}</span></> : n.label}
                 {n.count > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-ink text-bg text-[11px] font-medium grid place-items-center pop">{n.count}</span>}
               </a>
             ))}
-            <a href="#/" className="btn-dark !h-9 !min-h-0 ml-1 hidden sm:inline-flex">Check a vendor <ArrowDownRight size={15} aria-hidden="true" /></a>
+            <a href="#/" className="btn-dark !h-9 lg:!h-10 !min-h-0 lg:!text-[15px] ml-1 hidden sm:inline-flex">Check a vendor <ArrowDownRight size={15} aria-hidden="true" /></a>
           </nav>
         </div>
       </header>

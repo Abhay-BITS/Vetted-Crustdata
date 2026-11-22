@@ -18,11 +18,11 @@
 
 @layer components {
   .wrap { @apply max-w-site mx-auto px-5 md:px-8; }
-  .lead { @apply text-sm leading-[1.5] text-muted max-w-[230px]; }
+  .lead { @apply text-sm leading-[1.5] text-muted max-w-[230px] lg:text-[15px] lg:max-w-[260px]; }
   .lead b { @apply font-medium text-ink; }
-  .h-hero { @apply text-[36px] leading-[1.15] md:text-[48px] md:leading-[60px]; letter-spacing: -0.025em; }
+  .h-hero { @apply text-[36px] leading-[1.15] md:text-[48px] md:leading-[60px] lg:text-[56px] lg:leading-[1.08] min-[1360px]:text-[62px]; letter-spacing: -0.03em; }
   .h-sec { @apply text-[28px] leading-[1.2] md:text-[36px] md:leading-[44px]; letter-spacing: -0.025em; }
-  .body-lg { @apply text-base leading-[26px] text-muted; }
+  .body-lg { @apply text-base leading-[26px] text-muted lg:text-[18px] lg:leading-[30px]; }
 
   .btn { @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded text-sm font-medium transition-colors duration-150 select-none whitespace-nowrap; min-height: 44px; }
   .btn svg { transition: transform .2s cubic-bezier(.4,0,.2,1); }
@@ -32,6 +32,7 @@
   .btn-dark { @apply btn bg-ink text-bg hover:bg-[oklch(0.2_0_0)]; }
   .btn-soft { @apply btn bg-soft text-ink hover:bg-line; }
   .btn-ghost { @apply btn text-ink hover:bg-soft; }
+  .btn-lg { @apply lg:h-12 lg:px-5 lg:text-[16px] lg:gap-2.5; }
   .btn-bad { @apply btn bg-soft text-bad hover:bg-bad-bg; }
   .textlink { @apply inline-flex items-center gap-1.5 font-medium text-ink; }
   .textlink svg { transition: transform .2s cubic-bezier(.4,0,.2,1); }

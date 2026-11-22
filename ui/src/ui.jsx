@@ -40,7 +40,7 @@ export function Section({ id, lead, leadRest, title, body, children, className =
     <section id={id} className={`wrap ${className}`}>
       <div className="grid md:grid-cols-12 gap-x-8 gap-y-4">
         <p className={`md:col-span-4 lead pt-2 ${anim} ${enter ? 'enter-1' : ''}`}><b>{lead}</b>{leadRest ? <> {leadRest}</> : null}</p>
-        <div className="md:col-span-8 max-w-[560px]">
+        <div className="md:col-span-8 max-w-[560px] lg:max-w-[620px]">
           <T className={`${titleAs === 'h1' ? 'h-hero' : 'h-sec'} ${anim} ${enter ? 'enter-2' : ''}`}>{title}</T>
           {body && <p className={`mt-3 body-lg ${anim} ${enter ? 'enter-3' : ''}`}>{body}</p>}
         </div>
