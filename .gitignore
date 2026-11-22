@@ -1,0 +1,29 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# runtime data
+data/*.db
+data/*.db-*
+data/cache/
+logs/
+runs/
+
+# node / ui
+node_modules/
+ui/dist/
+
+# editor / tooling
+.DS_Store
+.vscode/
+.idea/
+.claude/
+CLAUDE.md
+.taste-skill/
