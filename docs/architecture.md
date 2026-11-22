@@ -1,5 +1,8 @@
 # Vetted: architecture
 
+The full technical architecture, pipeline sequence, exactly-once state machine, data model and business architecture
+diagrams are in the [README](../README.md#technical-architecture). The diagram below is the component overview.
+
 ```mermaid
 flowchart TB
     subgraph IN[Request]
