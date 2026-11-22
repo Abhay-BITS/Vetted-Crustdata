@@ -29,6 +29,8 @@ def build_result(ctx: RunContext, state: dict, stopped: str | None) -> dict:
         "flags": d.get("flags", []),
         "notes": d.get("notes", []),
         "missing": missing,
+        "personal_data": d.get("personal_data"),
+        "events": ctx.store.events_for(ctx.run_id),
         "facts": [{**f, "citation": cite(f)} for f in facts if f["verified"]],
         "rejected_facts": [f for f in facts if not f["verified"]],
         "cost": {**cost, "price_inr": price,

@@ -49,6 +49,10 @@ def main(argv=None) -> int:
     ap.add_argument("--approver", required=True)
     ap.add_argument("--reason", default="")
     sub.add_parser("execute")
+    rz = sub.add_parser("reset")
+    rz.add_argument("--all", action="store_true", help="also clear the response cache")
+    pg = sub.add_parser("purge")
+    pg.add_argument("--days", type=float)
     mi = sub.add_parser("import-master")
     mi.add_argument("csv_file")
     sh = sub.add_parser("show")
@@ -60,12 +64,29 @@ def main(argv=None) -> int:
         if args.file:
             with open(args.file) as f:
                 req = json.load(f)
+            if isinstance(req, dict) and req.get("vendors"):
+                from .batch import expand
+                bid, reqs = expand(Store(), req)
+                results = [run(r, on_step=_print_step) for r in reqs]
+                for x in results:
+                    print(f"{x['decision']:<15} {x['vendor']}  ({x['cost']['full_inr']} Rs full cost)")
+                return 0
         else:
             req = {k: v for k, v in {"vendor_name": args.name, "website": args.website, "cin": args.cin,
                                      "gstin": args.gstin, "pan": args.pan, "city": args.city,
                                      "directors": args.director, "bank_account": args.bank_account,
                                      "ifsc": args.ifsc, "text": args.text}.items() if v}
         res = run(req, run_id=args.run_id, on_step=_print_step)
+    elif args.cmd in ("reset", "purge"):
+        st = Store()
+        if args.cmd == "reset":
+            st.reset_demo(keep_cache=not args.all)
+            print("demo data cleared" + (" (cache too)" if args.all else " (cache kept)"))
+        else:
+            from .config import load_policy
+            days = args.days if args.days is not None else load_policy()["privacy"]["retention_days"]
+            print(json.dumps(st.purge_older_than(days)))
+        return 0
     elif args.cmd in ("actions", "decide", "execute", "import-master"):
         from . import actions as act
         st = Store()

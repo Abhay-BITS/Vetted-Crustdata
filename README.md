@@ -73,9 +73,9 @@ A fact whose value does not appear in its own quoted passage is dropped by the s
 - **Hard cases correct or `CANNOT_VERIFY`:** duplicates, lookalike names, common names with nothing to tell them apart.
 - **Every fact sourced** (passage + date); facts from model memory are impossible by construction.
 - **Each irreversible action executed exactly once** after a kill and restart.
-- **Within limits:** ≤ 180 s, ≤ 40 credits and ≤ ₹400 per vendor (all in `policy.yaml`).
+- **Within limits:** ≤ 240 s, ≤ 40 credits and ≤ ₹400 per vendor (all in `policy.yaml`).
 
-Current result on `tests/cases.json`: **9 / 9 passed, 0 wrong answers.**
+Current result on `tests/cases.json`: **13 / 13 passed, 0 wrong answers.**
 
 ## Data sources the service calls
 

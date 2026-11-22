@@ -56,7 +56,13 @@ class RegistryClient:
 
     def _get(self, source: str, url: str) -> tuple[str, str | None, float]:
         key = hash_request("registry", url)
-        cached = self.ctx.store.cache_get(key)
+        if "registry" in (self.ctx.policy.get("simulate", {}) or {}).get("unavailable", []):
+            self.ctx.store.record_call(run_id=self.ctx.run_id, step=self.ctx.step, provider=source,
+                                       endpoint=url, request_hash=key, outcome="unavailable")
+            self.ctx.log("simulated_outage", url=url)
+            return "unavailable", None, time.time()
+        ttl = float(self.ctx.policy.get("cache", {}).get("max_age_hours", 24)) * 3600
+        cached = self.ctx.store.cache_get(key, max_age_s=ttl)
         if cached is not None:
             self.ctx.store.record_call(run_id=self.ctx.run_id, step=self.ctx.step, provider=source,
                                        endpoint=url, request_hash=key, status_code=cached["status_code"],
@@ -183,6 +189,7 @@ class RegistryClient:
             if m and m.group(2) not in seen:
                 seen.add(m.group(2))
                 found.append({"cin": m.group(2), "legal_name": m.group(1).strip(), "url": url})
+                break  # first legal-name page that states a CIN is enough
         return found
 
 

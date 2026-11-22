@@ -25,7 +25,7 @@ export default function Checks() {
       {sum && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-12 stagger">
           <Stat label="Checks run" value={sum.runs} />
-          <Stat label="Average cost per check" value={sum.avg_cost_inr} money />
+          <Stat label="Cost per check, nothing cached" value={sum.avg_cost_inr} money />
           <Stat label="Price per vendor" value={sum.price_per_vendor_inr} money />
           <Stat label="Waiting for approval" value={sum.pending_approvals} />
         </div>
@@ -41,7 +41,7 @@ export default function Checks() {
                 <tr key={r.run_id} className="group border-b border-line last:border-0 hover:bg-bg transition-colors cursor-pointer" onClick={() => { window.location.hash = `#/run/${r.run_id}` }}>
                   <td className="px-5 py-3.5"><a className="font-medium" href={`#/run/${r.run_id}`} onClick={e => e.stopPropagation()}>{r.vendor || r.run_id}</a></td>
                   <td className="px-5 py-3.5"><DecisionBadge decision={r.decision} /></td>
-                  <td className="px-5 py-3.5 mono">{r.cost ? `${inr(r.cost.inr)} · ${r.cost.credits} cr` : '—'}</td>
+                  <td className="px-5 py-3.5 mono">{r.cost ? `${inr(r.cost.full_inr ?? r.cost.inr)} · ${r.cost.full_credits ?? r.cost.credits} cr` : '—'}</td>
                   <td className="px-5 py-3.5 text-muted text-sm">{when(r.created_at)}</td>
                   <td className="px-5 py-3.5 text-right"><ArrowDownRight size={16} className="inline text-muted transition-transform group-hover:translate-x-0.5 group-hover:translate-y-0.5 group-hover:text-ink" aria-hidden="true" /></td>
                 </tr>

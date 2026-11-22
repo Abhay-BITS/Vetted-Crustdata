@@ -23,4 +23,5 @@ export const api = {
     return r.json()
   },
   summary: () => req('/api/summary'),
+  batch: (id) => req(`/api/batches/${id}`),
 }

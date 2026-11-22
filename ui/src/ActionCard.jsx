@@ -12,14 +12,17 @@ export function useApprover() {
 export default function ActionCard({ action, approver, onChange, context }) {
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
+  const [blocking, setBlocking] = useState(false)
+  const [reason, setReason] = useState('')
   const p = action.payload || {}
   const open = action.status === 'pending_approval' || action.status === 'held'
 
   async function decide(verdict) {
     setErr('')
     if (!approver.trim()) { setErr('Type your name as the approver first.'); return }
+    if (verdict === 'block' && !reason.trim()) { setBlocking(true); setErr('Say why you are blocking it. The vendor is told the reason.'); return }
     setBusy(verdict)
-    try { await api.decide(action.action_id, verdict, approver, ''); onChange && onChange() }
+    try { await api.decide(action.action_id, verdict, approver, verdict === 'block' ? reason : ''); setBlocking(false); onChange && onChange() }
     catch (e) { setErr(e.message) } finally { setBusy('') }
   }
 
@@ -65,11 +68,15 @@ export default function ActionCard({ action, approver, onChange, context }) {
         <div className="mt-5 flex flex-wrap gap-2">
           <button className="btn-dark" onClick={() => decide('approve')} disabled={!!busy}><Check size={16} aria-hidden="true" />{busy === 'approve' ? 'Approving' : 'Approve'}</button>
           {action.status !== 'held' && <button className="btn-soft" onClick={() => decide('hold')} disabled={!!busy}><Pause size={16} aria-hidden="true" />Hold</button>}
-          <button className="btn-bad" onClick={() => decide('block')} disabled={!!busy}><Ban size={16} aria-hidden="true" />Block</button>
+          <button className="btn-bad" onClick={() => decide('block')} disabled={!!busy}><Ban size={16} aria-hidden="true" />{blocking ? 'Block with this reason' : 'Block'}</button>
+          {blocking && (
+            <input className="field basis-full pop" autoFocus value={reason} onChange={e => setReason(e.target.value)}
+                   placeholder="Reason for blocking, recorded and shared with the vendor" aria-label="Reason for blocking" />
+          )}
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted">
-          {action.approver ? <>Decided by <span className="font-medium text-ink">{action.approver}</span> · {when(action.updated_at)}</> : null}
+          {action.approver ? <>Decided by <span className="font-medium text-ink">{action.approver}</span> · {when(action.updated_at)}{action.reason ? <> · “{action.reason}”</> : null}</> : null}
           {action.status === 'done' && <> · executed <span className="font-medium text-ink">{action.executed_count} time{action.executed_count === 1 ? '' : 's'}</span></>}
         </p>
       )}

@@ -30,10 +30,14 @@ def run(request: dict, run_id: str | None = None, store: Store | None = None, on
             return existing["result"]
 
     ctx = RunContext(run_id=run_id, store=store, policy=load_policy())
-    first = store.q("SELECT MIN(started_at) s FROM steps WHERE run_id=?", (run_id,))[0]["s"]
-    if first:
-        # time limit counts from the original start, minus nothing: a resumed run keeps its clock
-        ctx.started_at = min(ctx.started_at, first)
+    done_steps = store.steps_for(run_id)
+    if done_steps:
+        # the time limit counts active work only, so downtime between a kill and a restart is not charged
+        active = sum((s["finished_at"] or 0) - (s["started_at"] or 0) for s in done_steps)
+        ctx.started_at = time.time() - active
+        names = {s["step"] for s in done_steps}
+        nxt = next((n for n, _ in STEPS if n not in names), None)
+        store.add_event(run_id, "resumed", {"completed_steps": len(names), "from_step": nxt})
     state: dict = {"request": request}
     stopped = None
     ctx.log("run_start", resumed=bool(existing))

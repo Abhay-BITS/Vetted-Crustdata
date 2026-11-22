@@ -46,25 +46,8 @@ export default function NewCheck() {
         </div>
       </Section>
 
-      {/* numbers */}
-      {stats && (
-        <section className="wrap mt-24 md:mt-32">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              ['Price per vendor', inr(stats.price_per_vendor_inr), 'flat, whatever the outcome'],
-              ['Measured cost per check', inr(stats.avg_cost_inr), 'average across checks run, from the cost ledger'],
-              ['Checks run', stats.runs, Object.entries(stats.decisions).map(([k, v]) => `${v} ${DECISIONS[k]?.label.toLowerCase() || k}`).join(', ')],
-              ['Waiting for a person', stats.pending_approvals, 'actions that cannot be undone'],
-            ].map(([k, v, d], i) => (
-              <div key={k} className={`panel p-5 reveal`} style={{ transitionDelay: `${i * 60}ms` }}>
-                <p className="text-sm font-medium">{k}</p>
-                <p className="text-[40px] leading-none font-medium tracking-tight mt-5">{v}</p>
-                <p className="text-sm text-muted mt-3">{d}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* unit economics */}
+      {stats && <Economics stats={stats} />}
 
       {/* features */}
       <Section className="mt-24 md:mt-32" lead="Registry first," leadRest="then staff, hiring and news from Crustdata."
@@ -126,7 +109,13 @@ export default function NewCheck() {
 
 function CheckForm() {
   const [mode, setMode] = useState('form')
-  const [f, setF] = useState(EMPTY)
+  const [f, setF] = useState(() => {
+    try {
+      const pre = JSON.parse(sessionStorage.getItem('vetted.prefill') || 'null')
+      if (pre) { sessionStorage.removeItem('vetted.prefill'); setTimeout(() => scrollToId('check'), 400); return { ...EMPTY, ...pre, directors: (pre.directors || []).join(', ') } }
+    } catch {}
+    return EMPTY
+  })
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -142,8 +131,8 @@ function CheckForm() {
     if (mode === 'text' && !text.trim()) { setErr('Paste the request first.'); return }
     setBusy(true)
     try {
-      const { run_id } = await api.startRun(body)
-      window.location.hash = `#/run/${run_id}`
+      const res = await api.startRun(body)
+      window.location.hash = res.batch_id ? `#/batch/${res.batch_id}` : `#/run/${res.run_id}`
     } catch (e2) { setErr(e2.message) } finally { setBusy(false) }
   }
 
@@ -152,7 +141,7 @@ function CheckForm() {
       <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-line">
         <div className="flex gap-1.5" aria-hidden="true"><span className="w-2.5 h-2.5 rounded-full bg-line" /><span className="w-2.5 h-2.5 rounded-full bg-line" /><span className="w-2.5 h-2.5 rounded-full bg-line" /></div>
         <div role="tablist" aria-label="Request format" className="inline-flex p-0.5 rounded-[9px] bg-soft">
-          {[['form', 'Vendor details'], ['text', 'Paste a request']].map(([k, l]) => (
+          {[['form', 'Vendor details'], ['text', 'Paste a request (one or several vendors)']].map(([k, l]) => (
             <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
                     className={`h-8 px-3 rounded-[8px] text-[13px] font-medium transition ${mode === k ? 'bg-card text-ink shadow-[0_1px_2px_oklch(0.289_0_0/.08)]' : 'text-muted hover:text-ink'}`}>{l}</button>
           ))}
@@ -173,7 +162,8 @@ function CheckForm() {
           <div>
             <label className="label" htmlFor="text">The client's request, as written</label>
             <textarea id="text" rows={6} className="field" value={text} onChange={e => setText(e.target.value)}
-                      placeholder="Here is a new vendor's name and website: Sharma Roadlines, sharmaroadlines.com. Tell me whether it is a real, trading business: who runs it, how long it has existed, and anything that looks off." />
+                      placeholder="Please clear these new carriers before Monday: Delhivery Limited (delhivery.com) and Blue Dart Express Limited, bluedart.com. Tell me whether each is a real, trading business, who runs it, how long it has existed, and anything that looks off." />
+            <p className="text-sm text-muted mt-2">Several vendors in one request are split and checked one after another.</p>
           </div>
         )}
         {err && <p role="alert" className="mt-4 text-sm text-bad">{err}</p>}
@@ -192,5 +182,50 @@ function Field({ id, label, hint, span, mono, ...rest }) {
       <label className="label" htmlFor={id}>{label}{hint && <span className="text-muted font-normal"> ({hint})</span>}</label>
       <input id={id} className={`field ${mono ? 'font-mono text-[13px] uppercase' : ''}`} {...rest} />
     </div>
+  )
+}
+
+function Economics({ stats }) {
+  const price = stats.price_per_vendor_inr || 0
+  const cost = stats.avg_cost_inr || 0
+  const margin = price ? Math.round(((price - cost) / price) * 100) : 0
+  return (
+    <Section className="mt-24 md:mt-32" lead="The numbers," leadRest="measured from the cost ledger of every check run here."
+             title="₹999 a vendor, about ₹30 to run"
+             body="The client pays a flat fee per vendor processed, whatever the outcome. The cost is what Crustdata credits and every other call actually add up to when nothing is cached.">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-10">
+        {[
+          ['Price per vendor', inr(price), 'flat, paid when the job is done'],
+          ['Cost per check', inr(cost), 'measured, nothing cached'],
+          ['Gross margin', `${margin}%`, 'price minus measured cost'],
+          ['Time per check', stats.avg_seconds ? `${Math.round(stats.avg_seconds)}s` : '—', 'against days of manual checks'],
+        ].map(([k, v, d], i) => (
+          <div key={k} className="panel p-5 reveal" style={{ transitionDelay: `${i * 60}ms` }}>
+            <p className="text-sm font-medium">{k}</p>
+            <p className="text-[40px] leading-none font-medium tracking-tight mt-5 tabular-nums">{v}</p>
+            <p className="text-sm text-muted mt-3">{d}</p>
+          </div>
+        ))}
+      </div>
+      <div className="panel mt-3 p-2 md:p-3 reveal">
+        <div className="frame overflow-x-auto" data-lenis-prevent>
+          <table className="w-full text-[15px]">
+            <thead className="text-left text-sm text-muted border-b border-line">
+              <tr>{['New vendors a month', 'Client pays', 'Our cost', 'Gross profit'].map(h => <th key={h} className="px-5 py-3.5 font-medium">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {[25, 50, 200].map(n => (
+                <tr key={n} className="border-b border-line last:border-0">
+                  <td className="px-5 py-3.5 font-medium">{n}</td>
+                  <td className="px-5 py-3.5 mono">{inr(n * price)}</td>
+                  <td className="px-5 py-3.5 mono">{inr(Math.round(n * cost))}</td>
+                  <td className="px-5 py-3.5 mono">{inr(Math.round(n * (price - cost)))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
   )
 }

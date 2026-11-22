@@ -63,6 +63,7 @@ def _startup() -> None:
 
 # --------------------------------------------------------------------------- runs
 class RunRequest(BaseModel):
+    vendors: list[dict] | None = None
     vendor_name: str | None = None
     website: str | None = None
     cin: str | None = None
@@ -76,15 +77,49 @@ class RunRequest(BaseModel):
     text: str | None = None
 
 
+def _start_sequence(items: list[tuple[str, dict]]) -> None:
+    """Run a batch one vendor after another (kind to the per-minute rate limits)."""
+    def work():
+        for rid, body in items:
+            try:
+                run(body, run_id=rid, store=store)
+            except Exception as e:
+                store.finish_run(rid, "failed", {"run_id": rid, "error": str(e)})
+    threading.Thread(target=work, daemon=True).start()
+
+
 @app.post("/api/runs")
 def create_run(req: RunRequest):
+    from .batch import expand
     body = {k: v for k, v in req.model_dump().items() if v}
     if not body:
         raise HTTPException(400, "send at least a vendor name, a website or free text")
-    rid = new_run_id()
-    store.create_run(rid, body)
-    _start(rid, body)
-    return {"run_id": rid}
+    batch_id, requests = expand(store, body)
+    items = []
+    for rq in requests:
+        rid = new_run_id()
+        store.create_run(rid, rq)
+        items.append((rid, rq))
+    if len(items) == 1 and not batch_id:
+        _start(*items[0])
+        return {"run_id": items[0][0]}
+    _start_sequence(items)
+    return {"batch_id": batch_id, "run_ids": [i[0] for i in items]}
+
+
+@app.get("/api/batches/{batch_id}")
+def get_batch(batch_id: str):
+    rows = store.q("SELECT run_id FROM runs WHERE request_json LIKE ? ORDER BY created_at", (f'%"batch_id": "{batch_id}"%',))
+    out = []
+    for r in rows:
+        rec = store.get_run(r["run_id"]) or {}
+        res = rec.get("result") or {}
+        out.append({"run_id": r["run_id"], "status": rec.get("status"), "request": rec.get("request"),
+                    "decision": res.get("decision"), "legal_name": res.get("legal_name"),
+                    "answers": res.get("answers"), "cost": res.get("cost") or store.run_cost(r["run_id"])})
+    if not out:
+        raise HTTPException(404, "no such batch")
+    return {"batch_id": batch_id, "runs": out}
 
 
 @app.get("/api/runs")
@@ -116,7 +151,7 @@ def get_run(run_id: str):
             marked = True
         else:
             steps.append({"step": name, "status": "pending", "seconds": None})
-    return {**rec, "steps": steps, "cost_live": store.run_cost(run_id),
+    return {**rec, "steps": steps, "cost_live": store.run_cost(run_id), "events": store.events_for(run_id),
             "actions": act.list_actions(store, run_id=run_id)}
 
 
@@ -150,6 +185,8 @@ def decide(action_id: str, verdict: str, v: Verdict):
         raise HTTPException(400, "verdict must be approve, hold or block")
     if not v.approver.strip():
         raise HTTPException(400, "a named approver is required")
+    if verdict == "block" and not v.reason.strip():
+        raise HTTPException(400, "give a reason for blocking; the vendor is told why")
     a = act.decide_action(store, action_id, verdict, v.approver.strip(), v.reason)
     if not a:
         raise HTTPException(404, "no such action")
@@ -187,15 +224,24 @@ def import_vendor_master_csv(st: Store, text: str) -> int:
 def summary():
     runs = store.q("SELECT result_json FROM runs WHERE result_json IS NOT NULL")
     decisions: dict[str, int] = {}
-    total_inr, n = 0.0, 0
+    full, paid, secs = [], [], []
     for r in runs:
         res = json.loads(r["result_json"])
+        if not res.get("decision"):
+            continue
         decisions[res.get("decision", "?")] = decisions.get(res.get("decision", "?"), 0) + 1
-        if res.get("cost", {}).get("calls"):
-            total_inr += res["cost"].get("inr", 0)
-            n += 1
+        c = res.get("cost") or {}
+        if c.get("full_inr"):
+            full.append(c["full_inr"])
+        paid.append(c.get("inr", 0))
+        if c.get("calls") and not c.get("cached_calls") and res.get("seconds"):
+            secs.append(res["seconds"])
     pol = load_policy()
-    return {"decisions": decisions, "runs": len(runs), "avg_cost_inr": round(total_inr / n, 2) if n else 0,
+    avg = lambda xs: round(sum(xs) / len(xs), 2) if xs else 0
+    return {"decisions": decisions, "runs": sum(decisions.values()),
+            "avg_cost_inr": avg(full),            # the cost of one check when nothing is cached
+            "avg_paid_inr": avg(paid),            # what was actually spent per check (cache reuse included)
+            "avg_seconds": avg(secs) or None,
             "price_per_vendor_inr": pol["pricing"]["price_per_vendor_inr"],
             "pending_approvals": len(act.list_actions(store, status="pending_approval"))}
 

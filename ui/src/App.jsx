@@ -7,6 +7,7 @@ import RunView from './pages/RunView'
 import Approvals from './pages/Approvals'
 import Checks from './pages/Checks'
 import Vendors from './pages/Vendors'
+import Batch from './pages/Batch'
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || '#/')
@@ -36,12 +37,13 @@ export default function App() {
   const nav = [
     { href: '#/approvals', key: 'approvals', label: 'Approvals', count: pending },
     { href: '#/checks', key: 'checks', label: 'Checks' },
-    { href: '#/vendors', key: 'vendors', label: 'Vendor master' },
+    { href: '#/vendors', key: 'vendors', label: 'Vendor master', short: 'Vendors' },
   ]
-  const active = route === 'run' ? 'checks' : route
+  const active = route === 'run' || route === 'batch' ? 'checks' : route
 
   let page
   if (route === 'run' && arg) page = <RunView key={arg} runId={arg} />
+  else if (route === 'batch' && arg) page = <Batch key={arg} batchId={arg} />
   else if (route === 'approvals') page = <Approvals />
   else if (route === 'checks') page = <Checks />
   else if (route === 'vendors') page = <Vendors />
@@ -59,7 +61,7 @@ export default function App() {
             {nav.map(n => (
               <a key={n.key} href={n.href} aria-current={active === n.key ? 'page' : undefined}
                  className={`relative flex items-center gap-1.5 h-9 px-3 rounded-[8px] text-sm whitespace-nowrap transition-colors ${active === n.key ? 'bg-card text-ink font-medium shadow-[0_1px_2px_oklch(0.289_0_0/.06)]' : 'text-ink hover:bg-line'}`}>
-                {n.label}
+                {n.short ? <><span className="hidden sm:inline">{n.label}</span><span className="sm:hidden">{n.short}</span></> : n.label}
                 {n.count > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-ink text-bg text-[11px] font-medium grid place-items-center pop">{n.count}</span>}
               </a>
             ))}

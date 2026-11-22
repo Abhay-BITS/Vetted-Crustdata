@@ -49,11 +49,19 @@ class CrustdataClient:
 
     def post(self, path: str, body: dict) -> ApiResult:
         key = hash_request("crustdata", path, body)
-        cached = self.ctx.store.cache_get(key)
+        if path.startswith("/web/") and "web" in (self.ctx.policy.get("simulate", {}) or {}).get("unavailable", []):
+            self.ctx.store.record_call(run_id=self.ctx.run_id, step=self.ctx.step, provider="crustdata",
+                                       endpoint=path, request_hash=key, outcome="unavailable")
+            self.ctx.log("simulated_outage", endpoint=path)
+            return ApiResult(ok=False, outcome="unavailable", error="simulated outage (policy.simulate)")
+        ttl = float(self.ctx.policy.get("cache", {}).get("max_age_hours", 24)) * 3600
+        cached = self.ctx.store.cache_get(key, max_age_s=ttl)
         if cached is not None:
+            lc = float(cached["headers"].get("_credits", 0) or 0)
             self.ctx.store.record_call(run_id=self.ctx.run_id, step=self.ctx.step, provider="crustdata",
                                        endpoint=path, request_hash=key, status_code=cached["status_code"],
-                                       outcome="cached", credits=0, inr=0, duration_ms=0)
+                                       outcome="cached", credits=0, inr=0, duration_ms=0,
+                                       list_credits=lc, list_inr=self.ctx.credits_to_inr(lc))
             data = json.loads(cached["body"]) if cached["body"] else None
             return ApiResult(ok=True, outcome="ok" if data else "not_found", data=data,
                              status_code=cached["status_code"], cached=True,
@@ -98,7 +106,7 @@ class CrustdataClient:
                 return ApiResult(ok=False, outcome="error", status_code=r.status_code, error=r.text[:300])
 
             now = time.time()
-            self.ctx.store.cache_put(key, "crustdata", r.status_code, r.text, {"_retrieved_at": now})
+            self.ctx.store.cache_put(key, "crustdata", r.status_code, r.text, {"_retrieved_at": now, "_credits": credits})
             self._ledger(path, key, r.status_code, "ok", credits, t0)
             return ApiResult(ok=True, outcome="ok", data=r.json(), status_code=r.status_code,
                              credits=credits, retrieved_at=now)
@@ -119,7 +127,8 @@ class CrustdataClient:
     def company_enrich(self, *, company_id: int | None = None, domain: str | None = None,
                        fields: list[str] | None = None) -> ApiResult:
         body: dict = {"crustdata_company_ids": [company_id]} if company_id else {"domains": [domain]}
-        body["fields"] = fields or ["basic_info", "headcount", "locations", "people", "news", "hiring"]
+        # people.founders + people.cxos only: the full "people" group returns ~300 profiles and takes ~80 s
+        body["fields"] = fields or ["basic_info", "headcount", "locations", "news", "hiring", "people.founders", "people.cxos"]
         return self.post("/company/enrich", body)
 
     def web_search(self, query: str, *, sources: list[str] | None = None, location: str | None = "IN",

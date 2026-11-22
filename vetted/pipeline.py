@@ -139,7 +139,8 @@ def step_duplicates(ctx: RunContext, state: dict) -> dict:
             continue
         if v.get("bank_account") and r.get("bank_account") and v["bank_account"] == r["bank_account"]:
             shared_bank.append({"vendor_id": r["vendor_id"], "legal_name": r["legal_name"]})
-        score = fuzz.token_set_ratio(norm_name(v.get("vendor_name")), norm_name(r.get("legal_name")))
+        # strict: every word must match, so "Blue Dart" is not a duplicate of "Blue Dart Aviation"
+        score = fuzz.token_sort_ratio(norm_name(v.get("vendor_name")), norm_name(r.get("legal_name")))
         if v.get("vendor_name") and score >= th:
             possible.append({"vendor_id": r["vendor_id"], "legal_name": r["legal_name"], "score": score})
     return {"checked": len(rows), "exact": exact, "possible": possible, "shared_bank": shared_bank}
@@ -219,8 +220,11 @@ def step_resolve(ctx: RunContext, state: dict) -> dict:
                 best = (score, m)
         if best:
             score, m = best
+            lab_v, lab_m = v["domain"].split(".")[0], m["domain"].split(".")[0]
+            dsim = fuzz.ratio(lab_v, lab_m)
             out["lookalike"] = {"resembles": m["name"], "their_domain": m["domain"],
                                 "supplied_domain": v["domain"], "name_similarity": round(score),
+                                "domain_similarity": round(dsim), "typo_domain": bool(dsim >= 80 and lab_v != lab_m),
                                 "their_size": m.get("size")}
     return out
 
@@ -292,39 +296,48 @@ def step_registry(ctx: RunContext, state: dict) -> dict:
             for hit in reg.cin_from_name(n):
                 if hit["cin"] not in cins:
                     cins.append(hit["cin"])
-    if not cins and names:
-        queries = [f"{names[0]} CIN company registration India"]
-        if len(names) > 1 and norm_name(names[1]) != norm_name(names[0]):
-            queries.append(f"{names[1]} CIN company registration India")
-        for q in queries:
+    want_domain = v.get("domain") or prof.get("domain")
+    best, scored, checked = None, [], set()
+
+    def consider(cin_list):
+        nonlocal best
+        for cin in cin_list:
+            if cin in checked or len(checked) >= 8:
+                continue
+            checked.add(cin)
+            page = reg.instafinancials(cin)
+            if page.outcome == "unavailable":
+                out["unavailable"].append(f"instafinancials:{cin}")
+                continue
+            if page.outcome != "ok":
+                continue
+            legal = (page.fields.get("legal_name") or {}).get("value", "")
+            # strict name similarity: extra words ("Freight Services") lower the score
+            name_score = max([fuzz.token_sort_ratio(norm_name(n), norm_name(legal)) for n in names] or [0])
+            site = domain_of((page.fields.get("website") or {}).get("value", "").split(":")[0])
+            site_bonus = 10 if (want_domain and site and site == want_domain) else 0
+            scored.append({"cin": cin, "legal_name": legal, "name_score": name_score, "site_match": bool(site_bonus)})
+            if v.get("cin") == cin or name_score >= 85:
+                if best is None or name_score + site_bonus > best[0]:
+                    best = (name_score + site_bonus, cin, page)
+
+    consider(cins)
+    if best is None and names:
+        # search phrasings that tend to surface the CIN in annual reports and registry pages
+        queries = []
+        for n in dict.fromkeys(names):
+            queries += [f"{n} CIN instafinancials", f"{n} CIN annual report"]
+        for q in queries[:3]:
             r = cd.web_search(q)
             out["search_status"] = r.outcome
             if r.ok and r.data:
                 blob = " ".join(f"{x.get('title','')} {x.get('snippet','')}" for x in r.data.get("results", []))
-                cins += [c for c in find_cins(blob) if c not in cins]
-            if len(cins) >= 3:
+                found = find_cins(blob)
+                cins += [c for c in found if c not in cins]
+                consider(found)
+            if best is not None:
                 break
-    out["candidates"] = cins[:6]
-
-    want_domain = v.get("domain") or prof.get("domain")
-    best, scored = None, []
-    for cin in cins[:6]:
-        page = reg.instafinancials(cin)
-        if page.outcome == "unavailable":
-            out["unavailable"].append(f"instafinancials:{cin}")
-            continue
-        if page.outcome != "ok":
-            continue
-        legal = (page.fields.get("legal_name") or {}).get("value", "")
-        # strict name similarity: extra words ("Freight Services") lower the score
-        name_score = max([fuzz.token_sort_ratio(norm_name(n), norm_name(legal)) for n in names] or [0])
-        site = domain_of((page.fields.get("website") or {}).get("value", "").split(":")[0])
-        site_bonus = 10 if (want_domain and site and site == want_domain) else 0
-        score = name_score + site_bonus
-        scored.append({"cin": cin, "legal_name": legal, "name_score": name_score, "site_match": bool(site_bonus)})
-        if v.get("cin") == cin or name_score >= 85:
-            if best is None or score > best[0]:
-                best = (score, cin, page)
+    out["candidates"] = cins[:8]
     out["scored"] = scored
     if best:
         # A registry record is only accepted when something besides a loose name ties it to this vendor:
@@ -371,19 +384,12 @@ def step_website(ctx: RunContext, state: dict) -> dict:
         return {"checked": False}
     dom = domain_of(site)
     urls = [f"https://{dom}", f"https://www.{dom}"] if dom else [site]
-    r = CrustdataClient(ctx).web_fetch(urls)
-    if r.ok and isinstance(r.data, list):
-        ok = [e for e in r.data if e.get("success")]
-        if ok:
-            e = ok[0]
-            return {"checked": True, "live": True, "via": "crustdata", "url": e.get("url") or urls[0],
-                    "title": (e.get("title") or "")[:200], "timestamp": e.get("timestamp"),
-                    "retrieved_at": r.retrieved_at}
-    # fallback: our own direct fetch (free); a block or timeout is "unknown", not "dead"
+    # 1) our own direct fetch first: free and fast
     import httpx
+    blocked = False
     for u in urls:
         try:
-            resp = httpx.get(u, timeout=15, follow_redirects=True,
+            resp = httpx.get(u, timeout=12, follow_redirects=True,
                              headers={"User-Agent": "Mozilla/5.0 (Macintosh) Chrome/130.0"})
         except Exception:
             continue
@@ -393,8 +399,18 @@ def step_website(ctx: RunContext, state: dict) -> dict:
             m = re.search(r"<title[^>]*>(.*?)</title>", resp.text, re.S | re.I)
             return {"checked": True, "live": True, "via": "direct", "url": str(resp.url),
                     "title": (m.group(1).strip() if m else "")[:200], "retrieved_at": time.time()}
-        if resp.status_code in (403, 429, 503):
-            return {"checked": True, "live": None, "url": u, "note": f"blocked ({resp.status_code})"}
+        blocked = blocked or resp.status_code in (403, 429, 503)
+    # 2) blocked or unreachable from here: ask Crustdata's fetcher (1 credit)
+    r = CrustdataClient(ctx).web_fetch(urls[:1])
+    if r.ok and isinstance(r.data, list):
+        ok = [e for e in r.data if e.get("success")]
+        if ok:
+            e = ok[0]
+            return {"checked": True, "live": True, "via": "crustdata", "url": e.get("url") or urls[0],
+                    "title": (e.get("title") or "")[:200], "timestamp": e.get("timestamp"),
+                    "retrieved_at": r.retrieved_at}
+    if blocked or not r.ok:
+        return {"checked": True, "live": None, "url": urls[0], "note": "site blocked automated access; not counted either way"}
     return {"checked": True, "live": False, "url": urls[0], "retrieved_at": time.time()}
 
 
@@ -642,8 +658,12 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     # flags
     if res.get("lookalike"):
         lk = res["lookalike"]
-        flags.append(f"Name resembles {lk['resembles']} ({lk['their_domain']}), but the supplied website is "
-                     f"{lk['supplied_domain']}: possible lookalike")
+        if lk.get("typo_domain"):
+            flags.append(f"The website {lk['supplied_domain']} is a near-copy of {lk['their_domain']}, the website of "
+                         f"{lk['resembles']}: possible impersonation")
+        else:
+            flags.append(f"Name resembles {lk['resembles']} ({lk['their_domain']}), but the supplied website is "
+                         f"{lk['supplied_domain']}: possible lookalike")
     if res.get("ambiguous"):
         flags.append("Several companies share this name: " + "; ".join(f"{a['name']} ({a['domain']})" for a in res["ambiguous"]))
         missing.append("the vendor's website or CIN to tell them apart")
@@ -679,6 +699,12 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     if prof.get("found") and v.get("domain") and prof.get("domain") and v["domain"] != prof["domain"]:
         flags.append(f"Supplied website {v['domain']} differs from the company's primary domain {prof['domain']}")
 
+    if inc and parse_date(inc):
+        age_days = days_ago(parse_date(inc)) or 0
+        if age_days < 30.4 * float(pol.get("front", {}).get("min_age_months", 6)):
+            flags.append(f"Incorporated {inc}, less than {pol['front']['min_age_months']} months ago: "
+                         f"a new company needs a person to look before money moves")
+
     # missing records
     pm = reg.get("possible_match")
     if not reg.get("cin") and pm:
@@ -704,6 +730,9 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     elif status and status.lower() in reject_statuses:
         decision = "REJECTED"
         reasons.append(f"Registry status is '{status}'")
+    elif status and status.lower() != "active":
+        decision = "REFER"
+        reasons.append(f"Registry status is '{status}', not Active: a person decides")
     elif res.get("lookalike") or dup.get("shared_bank") or id_flags or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
         decision = "REFER"
         reasons.append("Red flags need a person: " + "; ".join(flags))
@@ -744,8 +773,20 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     else:
         how_long = "Cannot verify"
 
+    keep = int(pol.get("privacy", {}).get("retention_days", 30))
+    personal = []
+    for d in reg_dirs:
+        personal.append({"name": d["name"], "din": d.get("din"), "what": "name, DIN, designation",
+                         "source": "MCA company record (public)", "why": "who runs the vendor"})
+    for s_ in (state.get("adverse") or {}).get("screened", []):
+        for p_ in personal:
+            if p_["name"] == s_["name"]:
+                p_["why"] += "; news screening"
+    personal_data = {"people": personal, "retention_days": keep,
+                     "not_collected": "personal emails, phone numbers, home addresses, photos"}
+
     return {"decision": decision, "reasons": reasons, "flags": flags, "notes": notes, "missing": missing,
-            "signals": signals, "legal_name": legal, "status": status,
+            "signals": signals, "legal_name": legal, "status": status, "personal_data": personal_data,
             "answers": {"real_and_trading": real, "who_runs_it": who, "how_long_it_has_existed": how_long,
                         "anything_off": flags or ["Nothing found"]}}
 

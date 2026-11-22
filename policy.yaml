@@ -2,7 +2,7 @@
 # Requirement changes and live fixes should be made here first.
 
 limits:
-  max_seconds_per_run: 180        # hard time limit per vendor run
+  max_seconds_per_run: 240        # hard time limit per vendor run (active time; downtime after a kill is not counted)
   max_credits_per_run: 40         # hard Crustdata credit limit per vendor run
   max_inr_per_run: 400            # hard cost limit per vendor run (all providers)
 
@@ -12,10 +12,22 @@ pricing:
   price_per_vendor_inr: 999       # what the client pays per vendor processed
 
 matching:
-  duplicate_name_threshold: 92    # rapidfuzz token_set_ratio on normalised names
+  duplicate_name_threshold: 92    # rapidfuzz token_sort_ratio on normalised names (every word must match)
   lookalike_name_threshold: 85    # name looks like a known company...
   lookalike_requires_domain_mismatch: true
   person_name_threshold: 88       # director name vs Crustdata person name
+
+front:
+  min_age_months: 6               # a company younger than this is flagged for a person to look at
+
+privacy:
+  retention_days: 30              # personal data (director names, DINs) is purged after this many days
+
+cache:
+  max_age_hours: 24               # records older than this are fetched again
+
+simulate:
+  unavailable: []                 # demo switch: ["registry"] or ["web"] makes that source time out
 
 activity:
   window_days: 180                # an activity signal must be newer than this
@@ -27,12 +39,13 @@ namesake:
 decision:
   # statuses that block a vendor outright (still needs a person to confirm)
   reject_statuses: ["strike off", "struck off", "dissolved", "under liquidation", "liquidated", "amalgamated", "dormant"]
+  # any other non-Active status (e.g. "Under process of striking off") is referred to a person
   refer_on_adverse_media: true
   cannot_verify_without_registry: true
 
 output:
   # extra fields can be appended here without code changes
-  fields: ["decision", "real_and_trading", "who_runs_it", "how_long_it_has_existed", "anything_off", "facts", "cost", "missing"]
+  fields: ["decision", "real_and_trading", "who_runs_it", "how_long_it_has_existed", "anything_off", "facts", "cost", "missing", "personal_data"]
 
 groq:
   model: "openai/gpt-oss-120b"

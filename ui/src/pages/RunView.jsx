@@ -70,9 +70,10 @@ export default function RunView({ runId }) {
 
           <div className="panel p-5">
             <h2 className="text-sm font-medium">Cost of this check</h2>
-            <CostFigure inr={cost.inr} />
+            <CostFigure inr={cost.full_inr ?? cost.inr} />
+            <p className="text-xs text-muted mt-2">Full cost with nothing cached. Paid this time: {inr(cost.inr)}.</p>
             <dl className="mt-4 grid grid-cols-2 gap-y-1.5 text-sm">
-              <dt className="text-muted">Crustdata credits</dt><dd className="text-right mono">{cost.credits ?? 0}</dd>
+              <dt className="text-muted">Crustdata credits</dt><dd className="text-right mono">{cost.full_credits ?? cost.credits ?? 0}</dd>
               <dt className="text-muted">LLM tokens</dt><dd className="text-right mono">{cost.tokens ?? 0}</dd>
               <dt className="text-muted">Calls, cached</dt><dd className="text-right mono">{cost.calls ?? 0}, {cost.cached_calls ?? 0}</dd>
               {r?.cost?.price_inr != null && <><dt className="text-muted">Price to client</dt><dd className="text-right mono">{inr(r.cost.price_inr)}</dd></>}
@@ -85,8 +86,14 @@ export default function RunView({ runId }) {
         </aside>
 
         <div className="md:col-span-8 min-w-0">
+          {(run.events || []).filter(e => e.kind === 'resumed').map((e, i) => (
+            <div key={i} className="pop mb-6 rounded bg-ok-bg text-ok px-4 py-3 text-sm flex flex-wrap gap-x-2">
+              <span className="font-medium">Resumed after a restart</span>
+              <span>at {new Date(e.ts * 1000).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}, from step {e.from_step || 'decision'} with {e.completed_steps} steps already saved. Nothing already paid for was paid again.</span>
+            </div>
+          ))}
           <h1 className="h-hero enter enter-1">{req.vendor_name || req.website || 'Vendor check'}</h1>
-          {r ? <Report r={r} /> : (
+          {r ? <Report r={{ ...r, request: req }} /> : (
             <p className="body-lg mt-3 enter enter-2" aria-live="polite"><span className="shimmer">Checking the registry, staff, hiring and news.</span> Each step is saved, so a restart picks up where it stopped.</p>
           )}
 
@@ -154,6 +161,14 @@ function Report({ r }) {
         ))}
       </dl>
 
+      {['CANNOT_VERIFY', 'REFER'].includes(r.decision) && (
+        <button className="btn-soft mt-6" onClick={() => {
+          const q = r.request || {}
+          sessionStorage.setItem('vetted.prefill', JSON.stringify({ vendor_name: q.vendor_name || r.vendor || '', website: q.website || '', cin: q.cin || '', gstin: q.gstin || '', city: q.city || '', directors: q.directors || [], contact_email: q.contact_email || '' }))
+          window.location.hash = '#/'
+        }}>Add the missing details and check again <ArrowDownRight size={16} aria-hidden="true" /></button>
+      )}
+
       {(r.reasons?.length > 0 || r.missing?.length > 0 || r.notes?.length > 0) && (
         <div className="mt-8 grid md:grid-cols-2 gap-x-8 gap-y-6">
           {r.reasons?.length > 0 && <List title="Why" items={r.reasons} />}
@@ -162,7 +177,24 @@ function Report({ r }) {
         </div>
       )}
 
-      <section className="panel mt-12 p-2 md:p-3" aria-labelledby="facts-h">
+      {r.personal_data && (
+        <section className="panel mt-12 p-5 md:p-6" aria-labelledby="pd-h">
+          <h2 id="pd-h" className="text-xl">Personal data used</h2>
+          <p className="text-sm text-muted mt-1">Only what the job needs, from public company records. Deleted after {r.personal_data.retention_days} days. Not collected: {r.personal_data.not_collected}.</p>
+          {r.personal_data.people?.length ? (
+            <ul className="mt-4 grid sm:grid-cols-2 gap-2 stagger">
+              {r.personal_data.people.map((p, i) => (
+                <li key={i} className="rounded bg-card px-4 py-3 text-sm">
+                  <p className="font-medium">{p.name} <span className="mono text-muted">DIN {p.din}</span></p>
+                  <p className="text-muted">{p.what} · {p.source} · used for {p.why}</p>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-muted mt-3">No personal data was used for this check.</p>}
+        </section>
+      )}
+
+      <section className="panel mt-3 p-2 md:p-3" aria-labelledby="facts-h">
         <div className="px-4 pt-4 pb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="facts-h" className="text-xl">Facts and their sources</h2>
           <span className="text-sm text-muted">{r.facts?.length || 0} passed the source check{r.rejected_facts?.length ? `, ${r.rejected_facts.length} dropped` : ''}</span>

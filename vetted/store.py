@@ -65,6 +65,13 @@ CREATE TABLE IF NOT EXISTS actions (             -- the outbox for irreversible 
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    ts REAL NOT NULL,
+    kind TEXT NOT NULL,
+    data_json TEXT
+);
 CREATE TABLE IF NOT EXISTS vendor_master (
     vendor_id TEXT PRIMARY KEY,
     legal_name TEXT,
@@ -91,6 +98,11 @@ class Store:
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=FULL")
         self.conn.executescript(SCHEMA)
+        for col in ("list_credits REAL DEFAULT 0", "list_inr REAL DEFAULT 0"):
+            try:
+                self.conn.execute(f"ALTER TABLE calls ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass
 
     # ---- generic -------------------------------------------------------
     def q(self, sql: str, args: tuple = ()) -> list[sqlite3.Row]:
@@ -140,11 +152,13 @@ class Store:
         return [dict(r) for r in rows]
 
     # ---- cache ---------------------------------------------------------
-    def cache_get(self, key: str) -> dict | None:
-        rows = self.q("SELECT status_code, body, headers_json FROM cache WHERE key=?", (key,))
+    def cache_get(self, key: str, max_age_s: float | None = None) -> dict | None:
+        rows = self.q("SELECT status_code, body, headers_json, created_at FROM cache WHERE key=?", (key,))
         if not rows:
             return None
         r = rows[0]
+        if max_age_s is not None and time.time() - r["created_at"] > max_age_s:
+            return None
         return {"status_code": r["status_code"], "body": r["body"], "headers": json.loads(r["headers_json"] or "{}")}
 
     def cache_put(self, key: str, provider: str, status_code: int, body: str, headers: dict) -> None:
@@ -154,17 +168,50 @@ class Store:
     # ---- cost ledger ---------------------------------------------------
     def record_call(self, **kw: Any) -> None:
         self.x("""INSERT INTO calls (run_id, step, provider, endpoint, request_hash, status_code, outcome,
-                  credits, tokens, inr, duration_ms, ts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  credits, tokens, inr, duration_ms, ts, list_credits, list_inr) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                (kw.get("run_id"), kw.get("step"), kw["provider"], kw["endpoint"], kw.get("request_hash"),
                 kw.get("status_code"), kw.get("outcome"), kw.get("credits", 0), kw.get("tokens", 0),
-                kw.get("inr", 0), kw.get("duration_ms"), time.time()))
+                kw.get("inr", 0), kw.get("duration_ms"), time.time(),
+                kw.get("list_credits", kw.get("credits", 0)), kw.get("list_inr", kw.get("inr", 0))))
 
     def run_cost(self, run_id: str) -> dict:
         r = self.q("""SELECT COALESCE(SUM(credits),0) c, COALESCE(SUM(tokens),0) t, COALESCE(SUM(inr),0) i,
+                      COALESCE(SUM(list_credits),0) lc, COALESCE(SUM(list_inr),0) li,
                       COUNT(*) n, SUM(CASE WHEN outcome='cached' THEN 1 ELSE 0 END) cached
                       FROM calls WHERE run_id=?""", (run_id,))[0]
         return {"credits": round(r["c"], 3), "tokens": r["t"], "inr": round(r["i"], 2),
-                "calls": r["n"], "cached_calls": r["cached"] or 0}
+                "calls": r["n"], "cached_calls": r["cached"] or 0,
+                # what this job costs when nothing is cached: the honest unit cost
+                "full_credits": round(max(r["lc"], r["c"]), 3), "full_inr": round(max(r["li"], r["i"]), 2)}
+
+    # ---- events (resumes, outages) -----------------------------------
+    def add_event(self, run_id: str, kind: str, data: dict | None = None) -> None:
+        self.x("INSERT INTO events (run_id, ts, kind, data_json) VALUES (?,?,?,?)",
+               (run_id, time.time(), kind, json.dumps(data or {}, default=str)))
+
+    def events_for(self, run_id: str) -> list[dict]:
+        rows = self.q("SELECT ts, kind, data_json FROM events WHERE run_id=? ORDER BY id", (run_id,))
+        return [{"ts": r["ts"], "kind": r["kind"], **json.loads(r["data_json"] or "{}")} for r in rows]
+
+    # ---- housekeeping ----------------------------------------------------
+    def reset_demo(self, keep_cache: bool = True) -> None:
+        for t in ("runs", "steps", "calls", "actions", "events"):
+            self.x(f"DELETE FROM {t}")
+        self.x("DELETE FROM vendor_master WHERE vendor_id NOT LIKE 'FX-%'")
+        if not keep_cache:
+            self.x("DELETE FROM cache")
+
+    def purge_older_than(self, days: float) -> dict:
+        """Delete runs (and the personal data in them) older than the retention period."""
+        cutoff = time.time() - days * 86400
+        old = [r["run_id"] for r in self.q("SELECT run_id FROM runs WHERE created_at < ?", (cutoff,))]
+        for rid in old:
+            for t in ("steps", "calls", "events"):
+                self.x(f"DELETE FROM {t} WHERE run_id=?", (rid,))
+            self.x("DELETE FROM actions WHERE run_id=? AND status NOT IN ('pending_approval','approved','executing')", (rid,))
+            self.x("DELETE FROM runs WHERE run_id=?", (rid,))
+        self.x("DELETE FROM cache WHERE created_at < ?", (cutoff,))
+        return {"runs_deleted": len(old)}
 
     def calls_for(self, run_id: str) -> list[dict]:
         return [dict(r) for r in self.q("SELECT * FROM calls WHERE run_id=? ORDER BY id", (run_id,))]
