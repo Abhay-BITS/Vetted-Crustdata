@@ -39,26 +39,29 @@ export default function NewCheck() {
       {/* hero: fills the first screen, the quay along its bottom */}
       <div className="relative min-h-[calc(100svh-7rem)] md:min-h-[calc(100svh-8rem)] flex flex-col">
         {/* hand-drawn extras in the empty space: same style as the quay */}
-        <div className="absolute inset-x-0 top-[44%] bottom-[180px] md:bottom-[220px] enter enter-5"><Sky /></div>
-        <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
-          <div className="wrap relative h-full">
-            <div className="absolute left-5 md:left-8 top-[170px] w-[180px] xl:w-[200px] enter enter-4"><Scanner /></div>
-          </div>
-        </div>
-        {/* the clipboard lives in the right margin, clear of the text, only where there is room */}
-        <div className="pointer-events-none absolute top-[10px] right-[2.5vw] hidden min-[1360px]:block w-[clamp(180px,13vw,240px)] enter enter-3" aria-hidden="true">
-          <Checklist />
-        </div>
-        <Section enter titleAs="h1" className="relative z-10 w-full pt-6 md:pt-10" lead="For 3PL vendor desks," leadRest="see who a new carrier really is before the first rupee moves."
-                 title="Vendor and carrier clearance, with a source for every fact"
-                 body="Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.">
-          <div className="md:grid md:grid-cols-12 gap-x-8">
-            <div className="md:col-start-5 md:col-span-8 mt-7 flex flex-wrap gap-2 enter enter-4">
-              <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
-              <a className="btn-soft btn-lg" href="#/approvals">See the approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
+        <div className="absolute inset-x-0 top-[62%] bottom-[170px] md:bottom-[210px] enter enter-5"><Sky /></div>
+        {/* One grid for the whole hero: left 3 columns (intro + magnifier), centre 6 (headline, text, buttons),
+            right 3 (clipboard). Left edges meet the logo pill, right edges meet the nav pill; the intro, the headline and
+            the clipboard share a top line, and the magnifier's bottom meets the buttons' bottom. */}
+        <section className="wrap relative z-10 w-full pt-6 md:pt-10">
+          <div className="grid md:grid-cols-12 gap-x-8 gap-y-4">
+            <div className="md:col-span-4 min-[1360px]:col-span-3 flex flex-col justify-between">
+              <p className="lead pt-3 enter enter-1"><b>For 3PL vendor desks,</b> see who a new carrier really is before the first rupee moves.</p>
+              <div className="hidden lg:block w-[180px] xl:w-[200px] mt-10 -mb-1 enter enter-4" aria-hidden="true"><Scanner /></div>
+            </div>
+            <div className="md:col-span-8 min-[1360px]:col-span-6 max-w-[620px]">
+              <h1 className="h-hero enter enter-2">Vendor and carrier clearance, with a source for every fact</h1>
+              <p className="mt-4 body-lg enter enter-3">Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.</p>
+              <div className="mt-8 flex flex-wrap gap-2 enter enter-4">
+                <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
+                <a className="btn-soft btn-lg" href="#/approvals">See the approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
+              </div>
+            </div>
+            <div className="hidden min-[1360px]:flex min-[1360px]:col-span-3 justify-end items-start pt-1" aria-hidden="true">
+              <div className="w-[clamp(200px,15vw,240px)] enter enter-3"><Checklist /></div>
             </div>
           </div>
-        </Section>
+        </section>
         <Frieze className="w-full mt-auto pt-10 enter enter-5" />
       </div>
 
