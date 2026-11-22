@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import ActionCard, { useApprover } from '../ActionCard'
-import { DecisionBadge, Section } from '../ui'
+import { Mail, Building2 } from 'lucide-react'
+import { DecisionBadge, Section, StatusPill, prettyName, when } from '../ui'
 import { ApprovalsScene } from '../scenes'
 
 function RunContext({ runId }) {
@@ -50,16 +51,50 @@ export default function Approvals() {
           </div>
           {done.length > 0 && (
             <section className="mt-14" aria-labelledby="done-h">
-              <h2 id="done-h" className="text-xl mb-4">Recently decided</h2>
-              <div className="panel p-2"><div className="frame divide-y divide-line stagger">
-                {done.map(a => (
-                  <div key={a.action_id} className="px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                    <a href={`#/run/${a.run_id}`} className="font-medium hover:underline underline-offset-4">{a.payload?.legal_name || a.payload?.subject || a.kind}</a>
-                    <span className="text-muted">{a.kind.replace('_', ' ')}</span>
-                    <span className="ml-auto text-muted">{a.status}{a.status === 'done' ? `, executed ${a.executed_count} time${a.executed_count === 1 ? '' : 's'}` : ''}{a.approver ? ` · ${a.approver}` : ''}</span>
-                  </div>
-                ))}
-              </div></div>
+              <div className="flex items-baseline justify-between mb-4">
+                <h2 id="done-h" className="text-xl">Recently decided</h2>
+                <span className="text-sm text-muted">Last {done.length}</span>
+              </div>
+              <div className="panel p-2 md:p-3">
+                <div className="frame overflow-x-auto" data-lenis-prevent>
+                  <table className="w-full text-sm table-fixed min-w-[680px]">
+                    <colgroup>
+                      <col className="w-[31%]" /><col className="w-[21%]" /><col className="w-[15%]" /><col className="w-[14%]" /><col className="w-[19%]" />
+                    </colgroup>
+                    <thead className="text-left text-muted border-b border-line">
+                      <tr>{['Vendor', 'Action', 'Result', 'Approver', 'When'].map(h => <th key={h} className="px-4 py-3 font-medium whitespace-nowrap">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="stagger">
+                      {done.map(a => {
+                        const email = a.kind === 'email_vendor'
+                        const vendor = prettyName(a.payload?.legal_name || (a.payload?.subject || '').split(': ').slice(1).join(': ')) || 'Vendor'
+                        return (
+                          <tr key={a.action_id} className="border-b border-line last:border-0 hover:bg-bg transition-colors align-top">
+                            <td className="px-4 py-3">
+                              <a href={`#/run/${a.run_id}`} className="font-medium block truncate hover:underline underline-offset-4" title={vendor}>{vendor}</a>
+                              {email && <span className="block text-muted truncate" title={a.payload?.subject}>{(a.payload?.subject || '').split(':')[0]}</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="flex items-center gap-1.5 min-w-0">
+                                {email ? <Mail size={14} className="text-muted shrink-0" aria-hidden="true" /> : <Building2 size={14} className="text-muted shrink-0" aria-hidden="true" />}
+                                <span className="truncate">{email ? 'Email sent' : 'Vendor added'}</span>
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <StatusPill status={a.status} />
+                                {a.status === 'done' && <span className="mono text-muted">{a.executed_count}×</span>}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 truncate" title={a.approver || ''}>{a.approver || '—'}{a.reason ? <span className="block text-muted truncate" title={a.reason}>{a.reason}</span> : null}</td>
+                            <td className="px-4 py-3 text-muted whitespace-nowrap">{new Date(a.updated_at * 1000).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </section>
           )}
         </div>

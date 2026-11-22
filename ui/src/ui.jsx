@@ -65,3 +65,15 @@ export const ACTION_LABEL = {
   email_vendor: 'Send an email to the vendor',
   test_payment: 'Send a test-mode payment',
 }
+
+/** "DELHIVERY LIMITED" -> "Delhivery Limited"; leaves mixed-case names alone. */
+export function prettyName(name) {
+  if (!name) return ''
+  if (name !== name.toUpperCase()) return name
+  const keep = new Set(['LLP', 'OPC', 'TCI', 'VRL', 'DHL', 'UPS', 'II', 'III'])
+  return name.toLowerCase().split(/(\s+|-)/).map(w => {
+    const up = w.toUpperCase()
+    if (keep.has(up)) return up
+    return w.charAt(0).toUpperCase() + w.slice(1)
+  }).join('')
+}
