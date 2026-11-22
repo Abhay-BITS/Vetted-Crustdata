@@ -113,10 +113,10 @@ function Plane() {
 /** Clouds drifting at different speeds and a cargo plane that crosses now and then. Full width. */
 export function Sky() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-x-clip">
       <div className="vt-cloud" style={{ top: '6%', '--dur': '110s', '--delay': '-30s', opacity: 0.9 }}><Cloud w={170} /></div>
       <div className="vt-cloud" style={{ top: '30%', '--dur': '150s', '--delay': '-95s', opacity: 0.75 }}><Cloud w={120} /></div>
-      <div className="vt-cloud" style={{ top: '52%', '--dur': '130s', '--delay': '-60s', opacity: 0.85 }}><Cloud w={140} /></div>
+      <div className="vt-cloud" style={{ top: '38%', '--dur': '130s', '--delay': '-60s', opacity: 0.85 }}><Cloud w={140} /></div>
       <div className="vt-cloud" style={{ top: '18%', '--dur': '170s', '--delay': '-140s', opacity: 0.6 }}><Cloud w={96} /></div>
       <div className="vt-plane" style={{ top: '40%' }}><div className="vt-glide"><Plane /></div></div>
     </div>
