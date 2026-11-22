@@ -25,6 +25,14 @@ OUTBOX_DIR = DATA_DIR / "outbox"
 OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def pretty(name: str | None) -> str:
+    """'DELHIVERY LIMITED' -> 'Delhivery Limited'; mixed-case names are left as written."""
+    if not name or name != name.upper():
+        return name or ""
+    keep = {"LLP", "OPC", "TCI", "VRL", "DHL", "UPS"}
+    return " ".join(w if w in keep else w.capitalize() for w in name.split())
+
+
 def action_key(run_id: str, kind: str, vendor: str) -> str:
     return hashlib.sha256(f"{run_id}|{kind}|{vendor}".encode()).hexdigest()[:20]
 
@@ -38,7 +46,8 @@ def propose_actions(store: Store, result: dict, request: dict) -> list[dict]:
     """Create the actions a person must approve, based on the decision. Idempotent."""
     run_id, vendor, decision = result["run_id"], result.get("vendor") or "vendor", result["decision"]
     contact = request.get("contact_email") or env("VENDOR_CONTACT_EMAIL", "vendor-desk@example.test")
-    legal = result.get("legal_name") or vendor
+    # address the vendor by the name it gave us (a lookalike must not be addressed as the real company)
+    legal = pretty(request.get("vendor_name") or result.get("legal_name") or vendor)
     proposals = []
     if decision == "CLEARED":
         cin = next((f["value"] for f in result.get("facts", []) if f["field"] == "cin"), None)
@@ -53,17 +62,24 @@ def propose_actions(store: Store, result: dict, request: dict) -> list[dict]:
                      f"Reasons on file:\n- " + "\n- ".join(result.get("reasons", [])) +
                      "\n\nRegards,\nVendor Onboarding")}))
     elif decision in ("REJECTED", "REFER", "CANNOT_VERIFY"):
-        missing = result.get("missing") or []
-        flags = result.get("flags") or []
+        # Only what the vendor can act on. Internal findings (data-source gaps, news screening,
+        # lookalike suspicions) stay with the reviewer and are never sent to the vendor.
+        docs = result.get("documents_to_request") or []
         if decision == "REJECTED":
-            subj, intro = f"Vendor registration not approved: {legal}", "We are unable to approve your vendor registration."
+            subj = f"Vendor registration not approved: {legal}"
+            status = result.get("registry_status")
+            why = (f"the Ministry of Corporate Affairs record for the company shows its status as \"{status}\""
+                   if status else "the public company record does not allow us to proceed")
+            body = (f"Dear {legal},\n\nWe are unable to approve your vendor registration at this time, because {why}.\n\n"
+                    "If the record is out of date, send us the updated MCA record or certificate and we will review it again.\n\n")
+            docs = []
         else:
-            subj, intro = f"Additional documents needed: {legal}", "We need a few more details before we can approve your registration."
-        body = f"Dear {legal},\n\n{intro}\n\n"
-        if flags:
-            body += "What we found:\n- " + "\n- ".join(flags) + "\n\n"
-        if missing:
-            body += "Please send:\n- " + "\n- ".join(missing) + "\n\n"
+            subj = f"Additional documents needed: {legal}"
+            body = f"Dear {legal},\n\nThank you for registering as a vendor. We need a few more details before we can approve it.\n\n"
+        if docs:
+            body += "Please send:\n- " + "\n- ".join(docs) + "\n\n"
+        elif decision != "REJECTED":
+            body += "Please send your certificate of incorporation (or GST registration certificate) and your official website.\n\n"
         body += "If you believe this is a mistake, reply to this email and a person will review it.\n\nRegards,\nVendor Onboarding"
         proposals.append(("email_vendor", {"to": contact, "subject": subj, "body": body}))
 

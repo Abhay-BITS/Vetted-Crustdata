@@ -834,6 +834,30 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     else:
         how_long = "Cannot verify"
 
+    # What the VENDOR can be asked for. Internal gaps (our data sources, news screening) never go to the vendor.
+    docs = []
+    def ask(x):
+        if x not in docs:
+            docs.append(x)
+    if not reg.get("cin"):
+        ask("Your company's CIN (Corporate Identification Number) or certificate of incorporation. "
+            "If you are a proprietorship, partnership or LLP, your GST registration certificate or LLP deed")
+    if res.get("ambiguous") or (not v.get("domain") and not prof.get("found")):
+        ask("Your company's official website")
+    if res.get("lookalike"):
+        ask("Your official website and CIN, so we can confirm we are dealing with the right company")
+    if any("GSTIN" in f for f in flags):
+        ask("A copy of your GST registration certificate")
+    if any("IFSC" in f for f in flags) or dup.get("shared_bank"):
+        ask("A cancelled cheque or a bank letter confirming the account number, IFSC and account holder name")
+    if any("not on the registry record" in f for f in flags):
+        ask("The current list of directors as filed with the Ministry of Corporate Affairs")
+    if not res.get("lookalike") and (any("less than" in f and "months ago" in f for f in flags)
+                                     or (status and status.lower() == "active" and not signals)):
+        ask("Proof that the business is trading: two recent invoices, or a recent GST return")
+    if status and status.lower() not in ("active",) and status.lower() not in [x.lower() for x in pol["decision"]["reject_statuses"]]:
+        ask("An explanation of the current company status shown on the MCA record")
+
     keep = int(pol.get("privacy", {}).get("retention_days", 30))
     personal = []
     for d in reg_dirs:
@@ -847,6 +871,7 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
                      "not_collected": "personal emails, phone numbers, home addresses, photos"}
 
     return {"decision": decision, "reasons": reasons, "flags": flags, "notes": notes, "missing": missing,
+            "documents_to_request": docs,
             "signals": signals, "legal_name": legal, "status": status, "personal_data": personal_data,
             "answers": {"real_and_trading": real, "who_runs_it": who, "how_long_it_has_existed": how_long,
                         "anything_off": flags or ["Nothing found"]}}
