@@ -94,3 +94,16 @@
 @keyframes vt-hop { 0%, 86%, 100% { transform: translateY(0); } 90% { transform: translateY(-6px); } 94% { transform: translateY(0); } }
 @keyframes vt-swing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 @media (prefers-reduced-motion: reduce) { .vt-walker, .vt-flyer { animation: none; display: none; } }
+
+/* stamp on approval, slow hop, staggered list entrance */
+@keyframes vt-stamp { 0% { transform: scale(1.8) rotate(-14deg); opacity: 0; } 60% { transform: scale(.94) rotate(-8deg); opacity: 1; } 100% { transform: scale(1) rotate(-8deg); opacity: 1; } }
+.vt-stamp { animation: vt-stamp .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes vt-hop-slow { 0%, 80%, 100% { transform: translateY(0); } 86% { transform: translateY(-4px); } 92% { transform: translateY(0); } }
+.vt-hop-slow { animation: vt-hop-slow 6s ease-in-out infinite; }
+.stagger > * { animation: enter .6s cubic-bezier(.2,.7,.2,1) both; }
+.stagger > *:nth-child(1) { animation-delay: .05s; } .stagger > *:nth-child(2) { animation-delay: .1s; } .stagger > *:nth-child(3) { animation-delay: .15s; }
+.stagger > *:nth-child(4) { animation-delay: .2s; } .stagger > *:nth-child(5) { animation-delay: .25s; } .stagger > *:nth-child(6) { animation-delay: .3s; }
+.stagger > *:nth-child(7) { animation-delay: .35s; } .stagger > *:nth-child(8) { animation-delay: .4s; } .stagger > *:nth-child(n+9) { animation-delay: .45s; }
+@media (prefers-reduced-motion: reduce) { .stagger > * { animation: none; } }
+.vt-bleed { width: 100vw; margin-left: calc(50% - 50vw); }
+html, body { overflow-x: clip; }

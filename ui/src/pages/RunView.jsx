@@ -3,6 +3,8 @@ import { Check, Loader2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '../api'
 import ActionCard, { useApprover } from '../ActionCard'
 import { DecisionBadge, DECISIONS, inr } from '../ui'
+import { RunScene } from '../scenes'
+import { useCountUp } from '../motion'
 
 const STEP_LABEL = {
   intake: 'Read the request', duplicates: 'Check the vendor master', resolve: 'Find the company',
@@ -39,6 +41,7 @@ export default function RunView({ runId }) {
 
   return (
     <div className="wrap">
+      <div className="vt-bleed enter mb-10"><RunScene progress={doneCount / run.steps.length} running={running} decision={r?.decision} /></div>
       <div className="grid md:grid-cols-12 gap-x-8 gap-y-10">
         <aside className="md:col-span-4 md:sticky md:top-28 self-start space-y-8 enter">
           <div>
@@ -52,7 +55,7 @@ export default function RunView({ runId }) {
               <span className="mono text-muted">{doneCount}/{run.steps.length}</span>
             </div>
             <div className="h-1 rounded-full bg-soft overflow-hidden mb-4"><div className="h-full bg-ink transition-all duration-500" style={{ width: `${(doneCount / run.steps.length) * 100}%` }} /></div>
-            <ol className="space-y-2">
+            <ol className="space-y-2 stagger">
               {run.steps.map(s => (
                 <li key={s.step} className="flex items-center gap-2.5 text-sm">
                   <span className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${s.status === 'done' ? 'bg-ink text-bg' : 'bg-soft'}`}>
@@ -67,7 +70,7 @@ export default function RunView({ runId }) {
 
           <div className="panel p-5">
             <h2 className="text-sm font-medium">Cost of this check</h2>
-            <p className="text-[40px] leading-none font-medium tracking-tight mt-4">{inr(cost.inr)}</p>
+            <CostFigure inr={cost.inr} />
             <dl className="mt-4 grid grid-cols-2 gap-y-1.5 text-sm">
               <dt className="text-muted">Crustdata credits</dt><dd className="text-right mono">{cost.credits ?? 0}</dd>
               <dt className="text-muted">LLM tokens</dt><dd className="text-right mono">{cost.tokens ?? 0}</dd>
@@ -116,7 +119,7 @@ export default function RunView({ runId }) {
                   <input className="field !h-10 w-48" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name" aria-label="Approver name" />
                 </label>
               </div>
-              <div className="space-y-3">{run.actions.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} />)}</div>
+              <div className="space-y-3 stagger">{run.actions.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} />)}</div>
             </section>
           )}
         </div>
@@ -164,7 +167,7 @@ function Report({ r }) {
           <h2 id="facts-h" className="text-xl">Facts and their sources</h2>
           <span className="text-sm text-muted">{r.facts?.length || 0} passed the source check{r.rejected_facts?.length ? `, ${r.rejected_facts.length} dropped` : ''}</span>
         </div>
-        <ul className="frame divide-y divide-line">
+        <ul className="frame divide-y divide-line stagger">
           {(r.facts || []).map((f, i) => (
             <li key={i} className="px-5 py-4 grid md:grid-cols-[170px_1fr] gap-x-6 gap-y-2">
               <div>
@@ -197,4 +200,9 @@ function List({ title, items }) {
       <ul className="space-y-1.5 text-[15px] text-muted">{items.map((x, i) => <li key={i} className="pl-4 relative before:content-[''] before:absolute before:left-0 before:top-[0.6em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-line">{x}</li>)}</ul>
     </div>
   )
+}
+
+function CostFigure({ inr: value }) {
+  const v = useCountUp(value || 0, 700)
+  return <p className="text-[40px] leading-none font-medium tracking-tight mt-4 tabular-nums">{inr(Math.round(v * 100) / 100)}</p>
 }

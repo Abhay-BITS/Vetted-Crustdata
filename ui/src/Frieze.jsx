@@ -15,7 +15,7 @@ const st = { stroke: INK, strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejo
 const thin = { stroke: INK, strokeWidth: 1, strokeLinecap: 'round', strokeLinejoin: 'round' }
 
 /* ---------- shared defs: a pencil wobble and hatching ---------- */
-function Defs() {
+export function Defs() {
   return (
     <svg width="0" height="0" className="absolute" aria-hidden="true" focusable="false">
       <defs>
@@ -35,7 +35,7 @@ function Defs() {
 }
 
 /* ---------- people ---------- */
-function Person({ coat = T.slate, trousers = T.denim, hat = 'none', pose = 'stand', flip = false, prop = null, skin = T.sand }) {
+export function Person({ coat = T.slate, trousers = T.denim, hat = 'none', pose = 'stand', flip = false, prop = null, skin = T.sand }) {
   const walk = pose === 'walk'
   const legL = walk ? 'M-4 -42 L-10 -3' : 'M-4 -42 L-5 -2'
   const legR = walk ? 'M4 -42 L9 -2' : 'M4 -42 L5 -2'
@@ -85,7 +85,7 @@ function Person({ coat = T.slate, trousers = T.denim, hat = 'none', pose = 'stan
 }
 
 /* ---------- objects ---------- */
-function Crates() {
+export function Crates() {
   return (
     <svg viewBox="0 0 70 56" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -99,7 +99,7 @@ function Crates() {
   )
 }
 
-function Containers() {
+export function Containers() {
   const box = (x, y, w, c, k) => (
     <g key={k}>
       <rect x={x} y={y} width={w} height="22" fill={c} {...st} />
@@ -117,7 +117,7 @@ function Containers() {
   )
 }
 
-function Truck() {
+export function Truck() {
   return (
     <svg viewBox="0 0 170 78" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -140,7 +140,7 @@ function Truck() {
   )
 }
 
-function Forklift() {
+export function Forklift() {
   return (
     <svg viewBox="0 0 90 80" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -159,7 +159,7 @@ function Forklift() {
   )
 }
 
-function Crane() {
+export function Crane() {
   return (
     <svg viewBox="0 0 120 190" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -181,7 +181,7 @@ function Crane() {
   )
 }
 
-function Bollard() {
+export function Bollard() {
   return (
     <svg viewBox="0 0 30 34" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -192,7 +192,7 @@ function Bollard() {
   )
 }
 
-function Parcel() {
+export function Parcel() {
   return (
     <svg viewBox="0 0 26 24" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)"><rect x="2" y="4" width="22" height="18" fill={T.sand} {...st} /><path d="M2 10 h22 M13 4 v6" {...thin} /></g>
@@ -200,7 +200,7 @@ function Parcel() {
   )
 }
 
-function Trolley() {
+export function Trolley() {
   return (
     <svg viewBox="0 0 34 60" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -212,7 +212,7 @@ function Trolley() {
   )
 }
 
-function Gull() {
+export function Gull() {
   return (
     <svg viewBox="0 0 44 18" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
@@ -225,7 +225,7 @@ function Gull() {
 }
 
 /* ---------- the quay ---------- */
-function Quay() {
+export function Quay() {
   return (
     <svg viewBox="0 0 1440 70" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[70px]" aria-hidden="true">
       <g filter="url(#vt-sketch)">
@@ -241,6 +241,56 @@ function Quay() {
     </svg>
   )
 }
+
+export function Warehouse() {
+  return (
+    <svg viewBox="0 0 150 110" className="w-full h-auto overflow-visible">
+      <g filter="url(#vt-sketch)">
+        <ellipse cx="75" cy="108" rx="72" ry="2.6" fill="url(#vt-hatch)" opacity=".7" />
+        <path d="M4 108 V44 L75 10 L146 44 V108 Z" fill={T.stone} {...st} />
+        <path d="M4 44 L75 10 L146 44" fill="none" {...st} />
+        <path d="M4 44 L75 10 L146 44 L146 52 L75 18 L4 52 Z" fill="url(#vt-hatch)" />
+        <rect x="40" y="58" width="70" height="50" fill={T.cream} {...st} />
+        {[...Array(6)].map((_, i) => <path key={i} d={`M40 ${66 + i * 7} h70`} {...thin} opacity=".45" />)}
+        <rect x="14" y="62" width="16" height="14" fill={T.sand} {...st} /><rect x="120" y="62" width="16" height="14" fill={T.sand} {...st} />
+        <text x="75" y="44" textAnchor="middle" fontFamily="Switzer, sans-serif" fontSize="10" fontWeight="500" fill={INK} opacity=".65">BAY 03</text>
+      </g>
+    </svg>
+  )
+}
+
+/**
+ * A quayside scene. sprites: [{el, x (% of stage), w (px at a 1440 stage), cls}]
+ * walkers / flyers: [{el, w, dur, delay, top, rtl}]
+ */
+export function Scene({ sprites = [], walkers = [], flyers = [], height = 'h-[250px] md:h-[290px]', className = '', children }) {
+  return (
+    <div className={`vt-frieze relative ${height} select-none ${className}`} aria-hidden="true">
+      <Defs />
+      <Quay />
+      <div className="vt-stage">
+        {sprites.map((s, i) => (
+          <div key={i} className="vt-sprite" style={{ left: `${s.x}%`, width: `${(s.w / 14.4).toFixed(3)}%`, transition: s.move ? 'left 1.1s cubic-bezier(.4,0,.2,1)' : undefined, ...(s.style || {}) }}>
+            <div className={`vt-inner ${s.cls || ''}`}>{s.el}</div>
+          </div>
+        ))}
+        {walkers.map((w, i) => (
+          <div key={'w' + i} className={`vt-sprite vt-walker ${w.rtl ? 'vt-rtl' : ''}`} style={{ '--dur': w.dur || '50s', '--delay': w.delay || '-10s', width: `${(w.w / 14.4).toFixed(3)}%` }}>
+            <div className="vt-inner vt-step">{w.el}</div>
+          </div>
+        ))}
+        {flyers.map((f, i) => (
+          <div key={'f' + i} className="vt-sprite vt-flyer" style={{ top: f.top || '10%', '--dur': f.dur || '50s', '--delay': f.delay || '-12s', width: `${(f.w / 14.4).toFixed(3)}%` }}>
+            <div className="vt-inner vt-glide" style={{ animationDelay: f.glideDelay || '0s' }}><Gull /></div>
+          </div>
+        ))}
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export const TONES = T
 
 /* Sprite placement: x is % of the stage width, w is px at 1440 (scaled by the stage). */
 const SPRITES = [

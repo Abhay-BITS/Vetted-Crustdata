@@ -24,7 +24,14 @@ export default function ActionCard({ action, approver, onChange, context }) {
   }
 
   return (
-    <article className="frame p-5 md:p-6">
+    <article className="frame p-5 md:p-6 relative overflow-hidden">
+      {['approved', 'executing', 'done', 'blocked', 'held'].includes(action.status) && (
+        <span key={action.status} aria-hidden="true"
+              className={`vt-stamp pointer-events-none absolute right-5 bottom-5 px-3 py-1.5 rounded-[8px] border-2 text-xs font-semibold uppercase tracking-[0.12em] ${action.status === 'blocked' ? 'border-bad text-bad' : action.status === 'held' ? 'border-unk text-unk' : 'border-ok text-ok'}`}
+              style={{ opacity: .85 }}>
+          {action.status === 'blocked' ? 'Blocked' : action.status === 'held' ? 'On hold' : action.status === 'done' ? `Done · ${action.executed_count}x` : 'Approved'}
+        </span>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="eyebrow mb-1.5">It plans to</p>

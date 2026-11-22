@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowDownRight } from 'lucide-react'
 import { api } from '../api'
 import { Section, when } from '../ui'
+import { VendorsScene } from '../scenes'
 
 export default function Vendors() {
   const [rows, setRows] = useState([])
@@ -21,7 +22,8 @@ export default function Vendors() {
     <Section enter titleAs="h1" lead="Client records," leadRest="the vendors the client already pays."
              title="Vendor master"
              body="Every new check is compared against this list for duplicates and shared bank accounts. Approved vendors are added here once.">
-      <div className="md:grid md:grid-cols-12 gap-x-8 mt-8">
+      <div className="vt-bleed mt-10 enter enter-4"><VendorsScene /></div>
+      <div className="md:grid md:grid-cols-12 gap-x-8 mt-12">
         <div className="md:col-start-5 md:col-span-8 flex flex-wrap items-center gap-3 enter enter-4">
           <label className="btn-dark cursor-pointer">
             Import a CSV <ArrowDownRight size={16} aria-hidden="true" />
@@ -37,7 +39,7 @@ export default function Vendors() {
             <thead className="text-left text-sm text-muted border-b border-line">
               <tr>{['Vendor', 'CIN', 'GSTIN', 'Website', 'City', 'Added'].map(h => <th key={h} className="px-5 py-3.5 font-medium">{h}</th>)}</tr>
             </thead>
-            <tbody>
+            <tbody className="stagger">
               {rows.map(r => (
                 <tr key={r.vendor_id} className="border-b border-line last:border-0 hover:bg-bg transition-colors">
                   <td className="px-5 py-3.5 font-medium">{r.legal_name}</td>

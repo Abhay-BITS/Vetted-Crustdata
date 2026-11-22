@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import ActionCard, { useApprover } from '../ActionCard'
 import { DecisionBadge, Section } from '../ui'
+import { ApprovalsScene } from '../scenes'
 
 function RunContext({ runId }) {
   const [run, setRun] = useState(null)
@@ -35,13 +36,14 @@ export default function Approvals() {
     <Section enter titleAs="h1" lead="Approvals," leadRest="the only part a person has to do."
              title="Actions waiting for a person"
              body="Nothing that cannot be undone happens on its own. Each action shows what Vetted found, what it plans to do and why, and runs once even if the service restarts.">
-      <div className="md:grid md:grid-cols-12 gap-x-8 mt-8">
+      <div className="vt-bleed mt-10 enter enter-5"><ApprovalsScene /></div>
+      <div className="md:grid md:grid-cols-12 gap-x-8 mt-12">
         <div className="md:col-start-5 md:col-span-8">
           <label className="flex items-center gap-3 max-w-md enter enter-4">
             <span className="text-sm font-medium whitespace-nowrap">Approver</span>
             <input className="field" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name, recorded with every decision" aria-label="Approver name" />
           </label>
-          <div className="mt-6 space-y-3">
+          <div className="mt-6 space-y-3 stagger">
             {items === null ? <p className="text-muted">Loading</p> : items.length === 0 ? (
               <div className="panel p-10 text-center text-muted">No actions are waiting. Run a check to create one.</div>
             ) : items.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} context={<RunContext runId={a.run_id} />} />)}
@@ -49,7 +51,7 @@ export default function Approvals() {
           {done.length > 0 && (
             <section className="mt-14" aria-labelledby="done-h">
               <h2 id="done-h" className="text-xl mb-4">Recently decided</h2>
-              <div className="panel p-2"><div className="frame divide-y divide-line">
+              <div className="panel p-2"><div className="frame divide-y divide-line stagger">
                 {done.map(a => (
                   <div key={a.action_id} className="px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                     <a href={`#/run/${a.run_id}`} className="font-medium hover:underline underline-offset-4">{a.payload?.legal_name || a.payload?.subject || a.kind}</a>
