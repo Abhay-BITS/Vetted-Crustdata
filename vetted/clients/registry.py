@@ -116,7 +116,8 @@ class RegistryClient:
         m = re.search(r"Incorp\. Date\s+(\d{2}-\d{2}-\d{4})", text)
         if m:
             page.fields["incorporation_date"] = {"value": m.group(1), "passage": _passage(text, m.start(), m.end())}
-        m = re.search(r"registered address of .+? is (.+?)\.\s", text)
+        m = re.search(r"registered address of .+? is (.+?\bIndia)\b", text) or \
+            re.search(r"\bAddress\s+(.{10,220}?\bIndia)\b", text)
         if m:
             page.fields["registered_address"] = {"value": m.group(1).strip(), "passage": _passage(text, m.start(), m.end(), 0)}
         m = re.search(r"Website\s+((?:https?://)?(?:www\.)?[a-z0-9.-]+\.[a-z]{2,})", text, re.I)

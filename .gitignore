@@ -18,7 +18,6 @@ runs/
 
 # node / ui
 node_modules/
-ui/dist/
 
 # editor / tooling
 .DS_Store
