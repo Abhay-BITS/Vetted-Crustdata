@@ -71,3 +71,26 @@
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .reveal { opacity: 1; transform: none; filter: none; }
 }
+
+/* ---------- the quayside frieze ---------- */
+.vt-frieze { clip-path: inset(-200% 0 0 0); }
+.vt-stage { position: absolute; left: 50%; transform: translateX(-50%); width: max(100%, 980px); top: 0; bottom: 66px; container-type: inline-size; }
+.vt-sprite { position: absolute; bottom: 0; }
+.vt-inner { transform-origin: 50% 100%; }
+.vt-walker, .vt-flyer { left: 0; animation: vt-drift var(--dur) linear var(--delay) infinite; will-change: transform; z-index: 1; }
+.vt-flyer { bottom: auto; }
+.vt-rtl { animation-direction: reverse; }
+.vt-step { animation: vt-step .48s ease-in-out infinite alternate; }
+.vt-glide { animation: vt-glide 2.8s ease-in-out infinite alternate; }
+.vt-hop { animation: vt-hop 5s ease-in-out infinite; }
+.vt-swing { transform-box: view-box; animation: vt-swing 3.6s ease-in-out infinite; }
+@supports (animation-timeline: scroll()) {
+  .vt-flyer { animation: vt-drift var(--dur) linear var(--delay) infinite, vt-rise linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 80svh; }
+}
+@keyframes vt-drift { from { transform: translateX(-110%); } to { transform: translateX(100cqw); } }
+@keyframes vt-rise { to { translate: 0 -4rem; } }
+@keyframes vt-step { from { transform: translateY(0) rotate(-1.2deg); } to { transform: translateY(-2.5px) rotate(1.2deg); } }
+@keyframes vt-glide { from { transform: translateY(0) rotate(-1.5deg); } to { transform: translateY(-10px) rotate(1.5deg); } }
+@keyframes vt-hop { 0%, 86%, 100% { transform: translateY(0); } 90% { transform: translateY(-6px); } 94% { transform: translateY(0); } }
+@keyframes vt-swing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+@media (prefers-reduced-motion: reduce) { .vt-walker, .vt-flyer { animation: none; display: none; } }

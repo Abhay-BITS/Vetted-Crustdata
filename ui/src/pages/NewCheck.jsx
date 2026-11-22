@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowDownRight, ArrowRight } from 'lucide-react'
 import { api } from '../api'
-import { Convoy } from '../Art'
+import Frieze from '../Frieze'
 import { useReveal, scrollToId } from '../motion'
 import { DecisionBadge, DECISIONS, Section, inr } from '../ui'
 
@@ -22,19 +22,20 @@ export default function NewCheck() {
 
   return (
     <div ref={ref}>
-      {/* hero */}
-      <Section enter titleAs="h1" lead="For 3PL vendor desks," leadRest="see who a new carrier really is before the first rupee moves."
-               title="Vendor and carrier clearance, with a source for every fact"
-               body="Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.">
-        <div className="md:grid md:grid-cols-12 gap-x-8">
-          <div className="md:col-start-5 md:col-span-8 mt-7 flex flex-wrap gap-2 enter enter-4">
-            <button className="btn-dark" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={16} aria-hidden="true" /></button>
-            <a className="btn-soft" href="#/approvals">See the approvals <ArrowDownRight size={16} aria-hidden="true" /></a>
+      {/* hero: fills the first screen, the quay along its bottom */}
+      <div className="min-h-[calc(100svh-7rem)] md:min-h-[calc(100svh-8rem)] flex flex-col">
+        <Section enter titleAs="h1" className="w-full pt-6 md:pt-10" lead="For 3PL vendor desks," leadRest="see who a new carrier really is before the first rupee moves."
+                 title="Vendor and carrier clearance, with a source for every fact"
+                 body="Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.">
+          <div className="md:grid md:grid-cols-12 gap-x-8">
+            <div className="md:col-start-5 md:col-span-8 mt-7 flex flex-wrap gap-2 enter enter-4">
+              <button className="btn-dark" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={16} aria-hidden="true" /></button>
+              <a className="btn-soft" href="#/approvals">See the approvals <ArrowDownRight size={16} aria-hidden="true" /></a>
+            </div>
           </div>
-        </div>
-      </Section>
-
-      <div className="mt-20 md:mt-24 enter enter-5"><Convoy /></div>
+        </Section>
+        <Frieze className="w-full mt-auto pt-10 enter enter-5" />
+      </div>
 
       {/* the form */}
       <Section id="check" className="mt-24 md:mt-32" lead="New check," leadRest="a name and a website are enough. Add a CIN, GSTIN or IFSC when you have them."
