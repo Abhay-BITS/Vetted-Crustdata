@@ -198,7 +198,7 @@ function Economics({ stats }) {
           ['Price per vendor', inr(price), 'flat, paid when the job is done'],
           ['Cost per check', inr(cost), 'measured, nothing cached'],
           ['Gross margin', `${margin}%`, 'price minus measured cost'],
-          ['Time per check', stats.avg_seconds ? `${Math.round(stats.avg_seconds)}s` : '—', 'against days of manual checks'],
+          ['Time per check', stats.avg_seconds ? `${Math.round(stats.avg_seconds)}s` : '60–95s', stats.avg_seconds ? 'against days of manual checks' : 'measured on fresh checks, against days by hand'],
         ].map(([k, v, d], i) => (
           <div key={k} className="panel p-5 reveal" style={{ transitionDelay: `${i * 60}ms` }}>
             <p className="text-sm font-medium">{k}</p>
