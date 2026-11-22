@@ -13,6 +13,7 @@ function Stat({ label, value, money }) {
 export default function Checks() {
   const [runs, setRuns] = useState(null)
   const [sum, setSum] = useState(null)
+  const [shown, setShown] = useState(10)
   useEffect(() => {
     const load = () => { api.runs().then(setRuns); api.summary().then(setSum) }
     load(); const t = setInterval(load, 3000); return () => clearInterval(t)
@@ -37,7 +38,7 @@ export default function Checks() {
               <tr>{['Vendor', 'Decision', 'Cost', 'Started', ''].map(h => <th key={h} className="px-5 py-3.5 font-medium">{h}</th>)}</tr>
             </thead>
             <tbody className="stagger">
-              {(runs || []).map(r => (
+              {(runs || []).slice(0, shown).map(r => (
                 <tr key={r.run_id} className="group border-b border-line last:border-0 hover:bg-bg transition-colors cursor-pointer" onClick={() => { window.location.hash = `#/run/${r.run_id}` }}>
                   <td className="px-5 py-3.5"><a className="font-medium" href={`#/run/${r.run_id}`} onClick={e => e.stopPropagation()}>{r.vendor || r.run_id}</a></td>
                   <td className="px-5 py-3.5"><DecisionBadge decision={r.decision} /></td>
@@ -49,6 +50,11 @@ export default function Checks() {
               {runs && runs.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">No checks yet.</td></tr>}
             </tbody>
           </table>
+          {runs && runs.length > shown && (
+            <button className="w-full h-12 border-t border-line text-sm font-medium hover:bg-bg transition" onClick={() => setShown(n => n + 10)}>
+              Show {Math.min(10, runs.length - shown)} more of {runs.length - shown} remaining
+            </button>
+          )}
         </div>
       </div>
     </Section>

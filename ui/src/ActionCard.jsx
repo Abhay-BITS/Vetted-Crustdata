@@ -36,6 +36,7 @@ export default function ActionCard({ action, approver, onChange, context }) {
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [blocking, setBlocking] = useState(false)
+  const [fullEmail, setFullEmail] = useState(false)
   const [reason, setReason] = useState('')
   const p = action.payload || {}
   const open = action.status === 'pending_approval' || action.status === 'held'
@@ -75,7 +76,15 @@ export default function ActionCard({ action, approver, onChange, context }) {
             <p><span className="text-muted">To</span> <span className="mono">{p.to}</span></p>
             <p><span className="text-muted">Subject</span> {p.subject}</p>
           </div>
-          <pre className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap font-sans text-[oklch(0.37_0_0)] max-h-56 overflow-auto" data-lenis-prevent>{p.body}</pre>
+          <div className="relative">
+            <pre className={`px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap font-sans text-[oklch(0.37_0_0)] ${fullEmail ? '' : 'max-h-[7.5rem] overflow-hidden'}`}>{p.body}</pre>
+            {!fullEmail && (p.body || '').split('\n').length > 6 && <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[oklch(0.982_0.002_84.559)] to-transparent pointer-events-none" />}
+          </div>
+          {(p.body || '').split('\n').length > 6 && (
+            <button className="px-4 pb-3 text-[13px] font-medium text-ink hover:underline underline-offset-4" onClick={() => setFullEmail(v => !v)}>
+              {fullEmail ? 'Show less' : 'Show full email'}
+            </button>
+          )}
         </div>
       )}
       {action.kind === 'activate_vendor' && (
