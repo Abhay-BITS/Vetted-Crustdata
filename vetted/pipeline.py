@@ -29,6 +29,31 @@ def norm_name(name: str | None) -> str:
     return re.sub(r"\s+", " ", n).strip()
 
 
+GENERIC_WORDS = {
+    "logistics", "logistic", "express", "transport", "transports", "transporters", "transportation", "cargo",
+    "carriers", "carrier", "roadlines", "roadways", "road", "lines", "movers", "packers", "freight", "services",
+    "service", "solutions", "india", "indian", "supply", "chain", "couriers", "courier", "shipping", "global",
+    "international", "enterprises", "enterprise", "trading", "traders", "group", "and", "of", "warehousing",
+}
+
+
+def brand_of(name: str | None) -> str:
+    """Distinctive part of a business name: legal suffixes and generic trade words removed."""
+    words = [w for w in norm_name(name).split() if w not in GENERIC_WORDS]
+    return " ".join(words)
+
+
+def full_legal(name: str | None) -> str:
+    n = (name or "").lower()
+    n = re.sub(r"\bpvt\b\.?", "private", n)
+    n = re.sub(r"\bltd\b\.?", "limited", n)
+    return re.sub(r"[^a-z0-9]", "", n)
+
+
+def has_legal_suffix(name: str | None) -> bool:
+    return bool(re.search(r"\b(private limited|pvt\.? ltd\.?|limited|ltd\.?|llp)\s*$", (name or "").lower()))
+
+
 def domain_of(url: str | None) -> str | None:
     if not url:
         return None
@@ -149,6 +174,12 @@ def step_resolve(ctx: RunContext, state: dict) -> dict:
         r = cd.company_identify(name=v["vendor_name"])
         out["source_status"]["identify_name"] = r.outcome
         by_name = _match_rows(r)
+        brand = brand_of(v["vendor_name"])
+        if brand and brand != norm_name(v["vendor_name"]) and len(brand) >= 3:
+            r2 = cd.company_identify(name=brand)
+            out["source_status"]["identify_brand"] = r2.outcome
+            seen = {m["id"] for m in by_name}
+            by_name += [m for m in _match_rows(r2) if m["id"] not in seen]
     out["candidates"] = (by_domain + by_name)[:8]
 
     if by_domain:
@@ -160,20 +191,37 @@ def step_resolve(ctx: RunContext, state: dict) -> dict:
         else:
             out["ambiguous"] = [{"name": m["name"], "domain": m["domain"]} for m in top[:5]]
 
-    # Lookalike: the claimed name resembles a company whose domain is not the one supplied.
-    if v.get("vendor_name") and v.get("domain"):
+    # Lookalike: the claimed name resembles a company whose website is not the one supplied,
+    # and the supplied website does not itself belong to a company with that name.
+    own_domains = set()
+    if out["company"]:
+        own_domains = {out["company"].get("domain")} | set(out["company"].get("all_domains") or [])
+    # The supplied website "backs" the claimed name when the company behind it carries that name
+    # (token_set: "Blue Dart" backs "Blue Dart Express Limited").
+    domain_backs_name = bool(out["company"]) and (
+        fuzz.token_set_ratio(norm_name(v.get("vendor_name")), norm_name(out["company"].get("name"))) >= 90)
+    out["domain_backs_name"] = domain_backs_name
+    if v.get("vendor_name") and v.get("domain") and not domain_backs_name:
+        best = None
         for m in by_name:
             if not m.get("domain"):
                 continue
-            score = fuzz.token_set_ratio(norm_name(v["vendor_name"]), norm_name(m["name"]))
+            score = fuzz.token_sort_ratio(norm_name(v["vendor_name"]), norm_name(m["name"]))
+            b_v, b_m = brand_of(v["vendor_name"]).replace(" ", ""), brand_of(m["name"]).replace(" ", "")
+            if b_v and b_m and len(b_v) >= 4:
+                score = max(score, fuzz.ratio(b_v, b_m))
             same_site = v["domain"] in ([m["domain"]] + m["all_domains"])
-            if score >= th and not same_site:
-                if out["company"] and out["company"].get("id") == m.get("id"):
-                    continue
-                out["lookalike"] = {"resembles": m["name"], "their_domain": m["domain"],
-                                    "supplied_domain": v["domain"], "name_similarity": score,
-                                    "their_size": m.get("size")}
-                break
+            if score < max(th, 90) or same_site:
+                continue
+            if out["company"] and (out["company"].get("id") == m.get("id") or m["domain"] in own_domains):
+                continue
+            if best is None or score > best[0]:
+                best = (score, m)
+        if best:
+            score, m = best
+            out["lookalike"] = {"resembles": m["name"], "their_domain": m["domain"],
+                                "supplied_domain": v["domain"], "name_similarity": round(score),
+                                "their_size": m.get("size")}
     return out
 
 
@@ -239,16 +287,28 @@ def step_registry(ctx: RunContext, state: dict) -> dict:
 
     cins = [v["cin"]] if v.get("cin") else []
     if not cins and names:
-        q = f"{names[0]} CIN company registration India"
-        r = cd.web_search(q)
-        out["search_status"] = r.outcome
-        if r.ok and r.data:
-            blob = " ".join(f"{x.get('title','')} {x.get('snippet','')}" for x in r.data.get("results", []))
-            cins = find_cins(blob)
-    out["candidates"] = cins[:4]
+        # free route first: legal-name slug pages that state the CIN
+        for n in names[:2]:
+            for hit in reg.cin_from_name(n):
+                if hit["cin"] not in cins:
+                    cins.append(hit["cin"])
+    if not cins and names:
+        queries = [f"{names[0]} CIN company registration India"]
+        if len(names) > 1 and norm_name(names[1]) != norm_name(names[0]):
+            queries.append(f"{names[1]} CIN company registration India")
+        for q in queries:
+            r = cd.web_search(q)
+            out["search_status"] = r.outcome
+            if r.ok and r.data:
+                blob = " ".join(f"{x.get('title','')} {x.get('snippet','')}" for x in r.data.get("results", []))
+                cins += [c for c in find_cins(blob) if c not in cins]
+            if len(cins) >= 3:
+                break
+    out["candidates"] = cins[:6]
 
-    best = None
-    for cin in cins[:4]:
+    want_domain = v.get("domain") or prof.get("domain")
+    best, scored = None, []
+    for cin in cins[:6]:
         page = reg.instafinancials(cin)
         if page.outcome == "unavailable":
             out["unavailable"].append(f"instafinancials:{cin}")
@@ -256,10 +316,39 @@ def step_registry(ctx: RunContext, state: dict) -> dict:
         if page.outcome != "ok":
             continue
         legal = (page.fields.get("legal_name") or {}).get("value", "")
-        score = max([fuzz.token_set_ratio(norm_name(n), norm_name(legal)) for n in names] or [0])
-        if v.get("cin") == cin or score >= 80:
+        # strict name similarity: extra words ("Freight Services") lower the score
+        name_score = max([fuzz.token_sort_ratio(norm_name(n), norm_name(legal)) for n in names] or [0])
+        site = domain_of((page.fields.get("website") or {}).get("value", "").split(":")[0])
+        site_bonus = 10 if (want_domain and site and site == want_domain) else 0
+        score = name_score + site_bonus
+        scored.append({"cin": cin, "legal_name": legal, "name_score": name_score, "site_match": bool(site_bonus)})
+        if v.get("cin") == cin or name_score >= 85:
             if best is None or score > best[0]:
                 best = (score, cin, page)
+    out["scored"] = scored
+    if best:
+        # A registry record is only accepted when something besides a loose name ties it to this vendor:
+        # the supplied CIN, the supplied website, the exact full legal name, or the supplied city.
+        _, cin, page = best
+        legal = (page.fields.get("legal_name") or {}).get("value", "")
+        addr = (page.fields.get("registered_address") or {}).get("value", "")
+        site = domain_of((page.fields.get("website") or {}).get("value", "").split(":")[0])
+        ties = []
+        if v.get("cin") == cin:
+            ties.append("supplied CIN")
+        if want_domain and site == want_domain:
+            ties.append("website on the record matches")
+        if v.get("vendor_name") and has_legal_suffix(v["vendor_name"]) and full_legal(v["vendor_name"]) == full_legal(legal):
+            ties.append("exact legal name")
+        if v.get("city") and v["city"].lower() in addr.lower():
+            ties.append("city matches the registered address")
+        if prof.get("found") and full_legal(legal).startswith(full_legal(prof.get("name"))) and want_domain:
+            ties.append("same company as the profile resolved from the website")
+        out["ties"] = ties
+        if not ties:
+            out["possible_match"] = {"cin": cin, "legal_name": legal,
+                                     "status": (page.fields.get("status") or {}).get("value"), "url": page.url}
+            best = None
     if best:
         _, cin, page = best
         out["cin"] = cin
@@ -280,17 +369,33 @@ def step_website(ctx: RunContext, state: dict) -> dict:
     site = v.get("website") or prof.get("website")
     if not site:
         return {"checked": False}
-    if "://" not in site:
-        site = "https://" + site
-    r = CrustdataClient(ctx).web_fetch([site])
-    if not r.ok or not isinstance(r.data, list):
-        return {"checked": True, "live": None, "outcome": r.outcome, "url": site}
-    ok = [e for e in r.data if e.get("success")]
-    if not ok:
-        return {"checked": True, "live": False, "url": site, "retrieved_at": r.retrieved_at}
-    e = ok[0]
-    return {"checked": True, "live": True, "url": e.get("url") or site, "title": (e.get("title") or "")[:200],
-            "timestamp": e.get("timestamp"), "retrieved_at": r.retrieved_at}
+    dom = domain_of(site)
+    urls = [f"https://{dom}", f"https://www.{dom}"] if dom else [site]
+    r = CrustdataClient(ctx).web_fetch(urls)
+    if r.ok and isinstance(r.data, list):
+        ok = [e for e in r.data if e.get("success")]
+        if ok:
+            e = ok[0]
+            return {"checked": True, "live": True, "via": "crustdata", "url": e.get("url") or urls[0],
+                    "title": (e.get("title") or "")[:200], "timestamp": e.get("timestamp"),
+                    "retrieved_at": r.retrieved_at}
+    # fallback: our own direct fetch (free); a block or timeout is "unknown", not "dead"
+    import httpx
+    for u in urls:
+        try:
+            resp = httpx.get(u, timeout=15, follow_redirects=True,
+                             headers={"User-Agent": "Mozilla/5.0 (Macintosh) Chrome/130.0"})
+        except Exception:
+            continue
+        ctx.store.record_call(run_id=ctx.run_id, step=ctx.step, provider="direct_fetch", endpoint=u,
+                              status_code=resp.status_code, outcome="ok" if resp.status_code < 400 else "error")
+        if resp.status_code < 400:
+            m = re.search(r"<title[^>]*>(.*?)</title>", resp.text, re.S | re.I)
+            return {"checked": True, "live": True, "via": "direct", "url": str(resp.url),
+                    "title": (m.group(1).strip() if m else "")[:200], "retrieved_at": time.time()}
+        if resp.status_code in (403, 429, 503):
+            return {"checked": True, "live": None, "url": u, "note": f"blocked ({resp.status_code})"}
+    return {"checked": True, "live": False, "url": urls[0], "retrieved_at": time.time()}
 
 
 # --------------------------------------------------------------------------- step 6: who runs it
@@ -425,9 +530,11 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     if dup.get("shared_bank"):
         flags.append("Bank account already belongs to another vendor in the master: " +
                      ", ".join(d["legal_name"] for d in dup["shared_bank"]))
+    notes = []
     reg_dirs = dirs.get("directors") or []
     if reg_dirs and not any(d["confirmed_at_company"] for d in reg_dirs) and prof.get("found"):
-        flags.append("None of the registry directors could be matched to the company's people in Crustdata")
+        notes.append("Registry directors were not found among the company's founders/CXOs in Crustdata "
+                     "(common for board-run companies; not treated as a red flag)")
     for c in dirs.get("claimed") or []:
         if c["on_registry"] is False:
             flags.append(f"Claimed director {c['name']} is not on the registry record")
@@ -435,7 +542,12 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
         flags.append(f"Supplied website {v['domain']} differs from the company's primary domain {prof['domain']}")
 
     # missing records
-    if not reg.get("cin"):
+    pm = reg.get("possible_match")
+    if not reg.get("cin") and pm:
+        missing.append(f"the vendor's CIN, website or city, to confirm it is {pm['legal_name']} (CIN {pm['cin']}, "
+                       f"registry status {pm.get('status')}) and not another business with a similar name")
+        notes.append(f"Possible registry match, not confirmed: {pm['legal_name']} (CIN {pm['cin']}, status {pm.get('status')})")
+    elif not reg.get("cin"):
         if reg.get("unavailable"):
             missing.append("company-registry record (registry source did not respond; this is not proof it is missing)")
         else:
@@ -494,8 +606,8 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     else:
         how_long = "Cannot verify"
 
-    return {"decision": decision, "reasons": reasons, "flags": flags, "missing": missing, "signals": signals,
-            "legal_name": legal, "status": status,
+    return {"decision": decision, "reasons": reasons, "flags": flags, "notes": notes, "missing": missing,
+            "signals": signals, "legal_name": legal, "status": status,
             "answers": {"real_and_trading": real, "who_runs_it": who, "how_long_it_has_existed": how_long,
                         "anything_off": flags or ["Nothing found"]}}
 

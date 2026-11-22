@@ -27,6 +27,7 @@ def build_result(ctx: RunContext, state: dict, stopped: str | None) -> dict:
         "answers": d.get("answers", {}),
         "reasons": d.get("reasons", []),
         "flags": d.get("flags", []),
+        "notes": d.get("notes", []),
         "missing": missing,
         "facts": [{**f, "citation": cite(f)} for f in facts if f["verified"]],
         "rejected_facts": [f for f in facts if not f["verified"]],

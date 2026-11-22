@@ -160,6 +160,31 @@ class RegistryClient:
         return page
 
 
+    # ---- companydetails.in: find a CIN from a legal-name slug ---------------
+    def cin_from_name(self, name: str) -> list[dict]:
+        """Try legal-name slugs; return [{"cin","legal_name","url"}] for pages that state a CIN."""
+        base = re.sub(r"[^a-z0-9 ]", " ", name.lower().replace("&", " and "))
+        base = re.sub(r"\b(pvt|private)\b", "private", base)
+        base = re.sub(r"\bltd\b", "limited", base)
+        base = re.sub(r"\s+", " ", base).strip()
+        variants = [base]
+        if not re.search(r"\b(limited|llp)$", base):
+            variants += [base + " private limited", base + " limited", base + " llp"]
+        found, seen = [], set()
+        for v in variants[:4]:
+            slug = v.replace(" ", "-")
+            url = f"https://www.companydetails.in/company/{slug}"
+            outcome, html, ts = self._get("companydetails", url)
+            if outcome != "ok" or not html:
+                continue
+            _, text = _clean(html)
+            m = re.search(r"CIN \(Corporate Identification Number\) of (.+?) is ([LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6})", text)
+            if m and m.group(2) not in seen:
+                seen.add(m.group(2))
+                found.append({"cin": m.group(2), "legal_name": m.group(1).strip(), "url": url})
+        return found
+
+
 def find_cins(text: str) -> list[str]:
     seen, out = set(), []
     for c in CIN_RE.findall(text or ""):
