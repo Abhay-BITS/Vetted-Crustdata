@@ -11,6 +11,9 @@ from .report import build_result
 from .store import Store
 
 
+PAID_STEPS = {"resolve", "profile", "registry", "website", "ids", "directors", "adverse"}
+
+
 def new_run_id() -> str:
     return time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
 
@@ -42,6 +45,11 @@ def run(request: dict, run_id: str | None = None, store: Store | None = None, on
             ctx.log("step_resumed_from_checkpoint")
             if on_step:
                 on_step(name, "resumed", saved)
+            continue
+        if name in PAID_STEPS and (state.get("duplicates") or {}).get("exact"):
+            out = {"skipped": "exact duplicate of a vendor already in the master; no paid lookups needed"}
+            state[name] = out
+            store.save_step(run_id, name, out, time.time())
             continue
         if stopped and name not in ("facts", "decide"):
             state[name] = {"skipped": stopped}

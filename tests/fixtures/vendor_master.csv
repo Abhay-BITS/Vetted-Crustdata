@@ -1,0 +1,3 @@
+vendor_id,legal_name,gstin,pan,cin,domain,bank_account,ifsc,city
+FX-0001,Orbit Freight Movers Private Limited,07AAACO8888K1ZP,AAACO8888K,,orbitfreight.example,50100012345678,HDFC0000001,New Delhi
+FX-0002,Vaayu Cold Chain Private Limited,27AAACV7777M1ZI,AAACV7777M,,vaayucold.example,00011122233344,ICIC0000001,Mumbai
