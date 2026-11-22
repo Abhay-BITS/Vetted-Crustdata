@@ -17,7 +17,13 @@ load_dotenv(ROOT / ".env", override=True)
 
 
 def env(name: str, default: str | None = None) -> str | None:
-    return os.environ.get(name, default)
+    """Read a setting; stray surrounding quotes (common when pasting into a hosting dashboard) are removed."""
+    v = os.environ.get(name, default)
+    if isinstance(v, str):
+        v = v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+            v = v[1:-1].strip()
+    return v
 
 
 def load_policy(path: Path | None = None) -> dict:
