@@ -13,10 +13,10 @@ const EMPTY = {
 }
 
 const SAMPLES = [
-  { label: 'Real carrier', data: { vendor_name: 'Delhivery Limited', website: 'delhivery.com', entity_type: 'public limited', city: 'New Delhi', claimed_since: '2011', pincode: '110037' } },
-  { label: 'Lookalike website', data: { vendor_name: 'Delhivery Limited', website: 'delhlvery.com', entity_type: 'public limited', contact_name: 'Ravi Kumar', contact_email: 'ravi.delhivery@gmail.com', claimed_since: '2005' } },
+  { label: 'Real carrier', data: { vendor_name: 'VRL Logistics Limited', website: 'vrlgroup.in', entity_type: 'public limited', city: 'Hubballi', claimed_since: '1983' } },
+  { label: 'Lookalike website', data: { vendor_name: 'VRL Logistics Limited', website: 'vrl-group.in', entity_type: 'public limited', contact_name: 'Ravi Kumar', contact_email: 'ravi.vrl@gmail.com', claimed_since: '1970' } },
   { label: 'Struck-off company', data: { vendor_name: 'Sharma Roadlines Private Limited', cin: 'U60220MH1989PTC051044', entity_type: 'private limited' } },
-  { label: 'Bad bank details', data: { vendor_name: 'Blue Dart Express Limited', website: 'bluedart.com', entity_type: 'public limited', gstin: '07AAACB0446L1ZX', ifsc: 'ABCD0123456', bank_account: '50100012345678', account_holder: 'Sharma Traders' } },
+  { label: 'Bad bank details', data: { vendor_name: 'TCI Express Limited', website: 'tciexpress.in', entity_type: 'public limited', gstin: '36AAFCT9800N1ZC', ifsc: 'ABCD0123456', bank_account: '50100012345678', account_holder: 'Sharma Traders' } },
   { label: 'Small transporter', data: { vendor_name: 'Sharma Roadlines', entity_type: 'proprietorship', city: 'Jaipur' } },
 ]
 
