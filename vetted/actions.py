@@ -54,7 +54,8 @@ def propose_actions(store: Store, result: dict, request: dict) -> list[dict]:
         proposals.append(("activate_vendor", {
             "vendor_name": vendor, "legal_name": legal, "cin": cin,
             "domain": request.get("website"), "gstin": request.get("gstin"), "pan": request.get("pan"),
-            "bank_account": request.get("bank_account"), "ifsc": request.get("ifsc"), "city": request.get("city"),
+            "bank_account_hash": request.get("bank_account_hash"), "bank_account_last4": request.get("bank_account_last4"),
+            "ifsc": request.get("ifsc"), "city": request.get("city"),
             "why": result.get("reasons", [])}))
         proposals.append(("email_vendor", {
             "to": contact, "subject": f"Vendor onboarding approved: {legal}",
@@ -141,7 +142,7 @@ def _perform(store: Store, a: dict) -> dict:
                    ifsc, city, status, added_at) VALUES (?,?,?,?,?,?,?,?,?, 'active', ?)""",
                 (a["action_id"], p.get("legal_name"), p.get("gstin"), p.get("pan"), p.get("cin"),
                  (p.get("domain") or "").replace("https://", "").replace("http://", "").strip("/") or None,
-                 p.get("bank_account"), p.get("ifsc"), p.get("city"), _now()))
+                 p.get("bank_account_hash"), p.get("ifsc"), p.get("city"), _now()))
         return {"vendor_id": a["action_id"], "added": True}
     if a["kind"] == "email_vendor":
         msg = EmailMessage()

@@ -21,8 +21,10 @@ def new_run_id() -> str:
 def run(request: dict, run_id: str | None = None, store: Store | None = None, on_step=None) -> dict:
     store = store or Store()
     run_id = run_id or new_run_id()
+    from .privacy import protect_request
     existing = store.get_run(run_id)
     if existing is None:
+        request = protect_request(request)
         store.create_run(run_id, request)
     else:
         request = existing["request"]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownRight, ArrowRight } from 'lucide-react'
+import { ArrowDownRight, ArrowRight, ChevronDown, ShieldCheck } from 'lucide-react'
 import { api } from '../api'
 import Frieze from '../Frieze'
 import { useReveal, scrollToId } from '../motion'
@@ -8,7 +8,7 @@ import { DecisionBadge, DECISIONS, Section, inr } from '../ui'
 
 const EMPTY = {
   vendor_name: '', website: '', entity_type: '', city: '', cin: '', llpin: '', gstin: '', pan: '', udyam: '',
-  registered_address: '', pincode: '', bank_account: '', ifsc: '', account_holder: '',
+  pincode: '', bank_account: '', ifsc: '', account_holder: '',
   contact_name: '', contact_designation: '', contact_email: '', claimed_since: '', directors: '',
 }
 
@@ -132,17 +132,26 @@ function CheckForm() {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [touched, setTouched] = useState({})
+  const [more, setMore] = useState(() => ['cin', 'gstin', 'pan', 'udyam', 'pincode', 'bank_account', 'ifsc', 'account_holder', 'contact_name', 'contact_email', 'directors'].some(k => (f[k] || '').trim()))
   const set = k => e => setF({ ...f, [k]: e.target.value })
-  const errs = Object.fromEntries(Object.keys(EMPTY).map(k => [k, check(k, f[k], f)]))
-  const hasErrors = Object.values(errs).some(m => m && !isWarning(m))
+  const touch = k => () => setTouched(t => ({ ...t, [k]: true }))
+  const allErrs = Object.fromEntries(Object.keys(EMPTY).map(k => [k, check(k, f[k], f)]))
+  const errs = Object.fromEntries(Object.entries(allErrs).map(([k, m]) => [k, touched[k] || touched.__submit ? m : '']))
+  const hasErrors = Object.values(allErrs).some(m => m && !isWarning(m))
+  const gst = (f.gstin || '').trim().toUpperCase()
+  const panFromGst = gst.length === 15 ? gst.slice(2, 12) : ''
+  const company = !['proprietorship', 'partnership'].includes(f.entity_type)
+  const extras = ['cin', 'llpin', 'gstin', 'pan', 'udyam', 'pincode', 'bank_account', 'ifsc', 'account_holder', 'contact_name', 'contact_designation', 'contact_email', 'directors'].filter(k => (f[k] || '').trim()).length
+  const fill = data => { setF({ ...EMPTY, ...data }); setTouched({}); setMore(Object.keys(data).some(k => !['vendor_name', 'website', 'entity_type', 'city', 'claimed_since'].includes(k))) }
 
   async function submit(e) {
     e.preventDefault()
     setErr('')
-    if (mode === 'form' && hasErrors) { setErr('Fix the highlighted fields first.'); return }
+    if (mode === 'form' && hasErrors) { setTouched(t => ({ ...t, __submit: true })); setMore(true); setErr('Fix the highlighted fields first.'); return }
     const body = mode === 'text'
       ? { text }
-      : Object.fromEntries(Object.entries({ ...f, directors: f.directors ? f.directors.split(',').map(s => s.trim()).filter(Boolean) : null }).filter(([, v]) => v && (!Array.isArray(v) || v.length)))
+      : Object.fromEntries(Object.entries({ ...f, pan: f.pan || panFromGst, cin: company ? f.cin : '', directors: f.directors ? f.directors.split(',').map(s => s.trim()).filter(Boolean) : null }).filter(([, v]) => v && (!Array.isArray(v) || v.length)))
     if (mode === 'form' && !body.vendor_name && !body.website) { setErr('Give the vendor name or its website.'); return }
     if (mode === 'text' && !text.trim()) { setErr('Paste the request first.'); return }
     setBusy(true)
@@ -167,16 +176,18 @@ function CheckForm() {
         {mode === 'form' ? (
           <div className="space-y-7">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted mr-1">Try a sample:</span>
+              <span className="text-sm text-muted mr-1">Try a sample (demo):</span>
               {SAMPLES.map(x => (
-                <button key={x.label} type="button" className="h-8 px-3 rounded-full bg-soft text-[13px] font-medium hover:bg-line transition"
-                        onClick={() => setF({ ...EMPTY, ...x.data })}>{x.label}</button>
+                <button key={x.label} type="button" className="h-8 px-3 rounded-full bg-soft text-[13px] font-medium hover:bg-line transition" onClick={() => fill(x.data)}>{x.label}</button>
               ))}
             </div>
 
-            <Group title="Company">
-              <Field id="vendor_name" label="Vendor name" span placeholder="Blue Dart Express Limited" value={f.vendor_name} onChange={set('vendor_name')} />
-              <Field id="website" label="Website" placeholder="bluedart.com" value={f.website} onChange={set('website')} error={errs.website} />
+            <p className="flex items-start gap-2 text-xs text-muted"><ShieldCheck size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+              Used only to verify this vendor and deleted after 30 days. We never ask for personal ID numbers, home addresses or personal phone numbers.</p>
+
+            <Group title="Company" note="A name or a website is enough to start. Fields marked * are needed.">
+              <Field id="vendor_name" label="Vendor name *" span placeholder="e.g. Blue Dart Express Limited" value={f.vendor_name} onChange={set('vendor_name')} onBlur={touch('vendor_name')} />
+              <Field id="website" label="Website *" hint="or the name above" placeholder="e.g. bluedart.com" value={f.website} onChange={set('website')} onBlur={touch('website')} error={errs.website} />
               <div>
                 <label className="label" htmlFor="entity_type">Type of business</label>
                 <select id="entity_type" className="field" value={f.entity_type} onChange={set('entity_type')}>
@@ -188,37 +199,43 @@ function CheckForm() {
                   <option value="proprietorship">Proprietorship</option>
                 </select>
               </div>
-              <Field id="city" label="City" placeholder="Mumbai" value={f.city} onChange={set('city')} />
-              <Field id="claimed_since" label="In business since" hint="year the vendor says" placeholder="1991" value={f.claimed_since} onChange={set('claimed_since')} error={errs.claimed_since} />
+              <Field id="city" label="City of registered office" placeholder="e.g. Mumbai" value={f.city} onChange={set('city')} />
+              <Field id="claimed_since" label="In business since" hint="the year the vendor says" placeholder="e.g. 1991" value={f.claimed_since} onChange={set('claimed_since')} onBlur={touch('claimed_since')} error={errs.claimed_since} />
             </Group>
 
-            <Group title="Tax and registration" note="Checked against the MCA record and the GSTIN's own structure.">
-              {f.entity_type === 'llp'
-                ? <Field id="llpin" label="LLPIN" mono placeholder="AAB-1234" value={f.llpin} onChange={set('llpin')} error={errs.llpin} />
-                : <Field id="cin" label="CIN" mono placeholder="L61074MH1991PLC061074" value={f.cin} onChange={set('cin')} error={errs.cin} />}
-              <Field id="gstin" label="GSTIN" mono placeholder="27AAACB0446L1ZS" value={f.gstin} onChange={set('gstin')} error={errs.gstin} />
-              <Field id="pan" label="PAN" mono placeholder="AAACB0446L" value={f.pan} onChange={set('pan')} error={errs.pan} />
-              <Field id="udyam" label="Udyam (MSME) number" hint="if an MSME" mono placeholder="UDYAM-MH-02-0012345" value={f.udyam} onChange={set('udyam')} error={errs.udyam} />
-              <Field id="registered_address" label="Registered office address" span placeholder="Andheri (East), Mumbai, Maharashtra" value={f.registered_address} onChange={set('registered_address')} />
-              <Field id="pincode" label="PIN code" placeholder="400099" value={f.pincode} onChange={set('pincode')} error={errs.pincode} />
-            </Group>
+            <button type="button" onClick={() => setMore(m => !m)} aria-expanded={more}
+                    className="w-full flex items-center justify-between rounded bg-soft hover:bg-line transition px-4 h-12 text-sm font-medium">
+              <span>Add more details (optional){extras ? <span className="text-muted font-normal"> · {extras} added</span> : null}</span>
+              <ChevronDown size={18} className={`transition-transform ${more ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
 
-            <Group title="Bank" note="The IFSC is looked up live; the account holder must be the company itself.">
-              <Field id="bank_account" label="Account number" mono placeholder="50100012345678" value={f.bank_account} onChange={set('bank_account')} error={errs.bank_account} />
-              <Field id="ifsc" label="IFSC" mono placeholder="HDFC0000001" value={f.ifsc} onChange={set('ifsc')} error={errs.ifsc} />
-              <Field id="account_holder" label="Account holder name" span placeholder="Blue Dart Express Limited" value={f.account_holder} onChange={set('account_holder')} />
-            </Group>
+            {more && (
+              <div className="space-y-7 pop">
+                <Group title="Tax and registration" note="Checked against the MCA record and the GSTIN's own structure.">
+                  <Field id="gstin" label="GSTIN" mono placeholder="e.g. 27AAACB0446L1ZS" value={f.gstin} onChange={set('gstin')} onBlur={touch('gstin')} error={errs.gstin} />
+                  {panFromGst
+                    ? <div><label className="label" htmlFor="pan">PAN <span className="text-muted font-normal">(from the GSTIN)</span></label><input id="pan" className="field font-mono text-[13px]" value={panFromGst} readOnly /></div>
+                    : <Field id="pan" label="PAN" hint="if there is no GSTIN" mono placeholder="e.g. AAACB0446L" value={f.pan} onChange={set('pan')} onBlur={touch('pan')} error={errs.pan} />}
+                  {company && f.entity_type !== 'llp' && <Field id="cin" label="CIN" mono placeholder="e.g. L61074MH1991PLC061074" value={f.cin} onChange={set('cin')} onBlur={touch('cin')} error={errs.cin} />}
+                  {f.entity_type === 'llp' && <Field id="llpin" label="LLPIN" hint="recorded on the evidence file; not checked yet" mono placeholder="e.g. AAB-1234" value={f.llpin} onChange={set('llpin')} onBlur={touch('llpin')} error={errs.llpin} />}
+                  <Field id="pincode" label="Registered office PIN code" placeholder="e.g. 400099" value={f.pincode} onChange={set('pincode')} onBlur={touch('pincode')} error={errs.pincode} />
+                  <Field id="udyam" label="Udyam (MSME) number" hint="format checked; adds the 45-day payment note" mono span placeholder="e.g. UDYAM-MH-02-0012345" value={f.udyam} onChange={set('udyam')} onBlur={touch('udyam')} error={errs.udyam} />
+                </Group>
 
-            <Group title="Contact person" note="We check that this person works at the company and that the email is at the company's domain.">
-              <Field id="contact_name" label="Name" placeholder="Balfour John Manuel" value={f.contact_name} onChange={set('contact_name')} />
-              <Field id="contact_designation" label="Designation" placeholder="Managing Director" value={f.contact_designation} onChange={set('contact_designation')} />
-              <Field id="contact_email" label="Work email" hint="approved emails go here only if it is a teammate's inbox" span type="email" placeholder="name@bluedart.com" value={f.contact_email} onChange={set('contact_email')} error={errs.contact_email} />
-              <Field id="directors" label="Directors named on the vendor's application" hint="optional, comma separated: checked against the official record" span placeholder="Balfour John Manuel" value={f.directors} onChange={set('directors')} />
-            </Group>
+                <Group title="Bank" note="The IFSC is looked up live and the account holder must be the company. The account number is stored only as a one-way hash and its last 4 digits.">
+                  <Field id="bank_account" label="Account number" mono placeholder="e.g. 50100012345678" value={f.bank_account} onChange={set('bank_account')} onBlur={touch('bank_account')} error={errs.bank_account} />
+                  <Field id="ifsc" label="IFSC" mono placeholder="e.g. HDFC0000001" value={f.ifsc} onChange={set('ifsc')} onBlur={touch('ifsc')} error={errs.ifsc} />
+                  <Field id="account_holder" label="Account holder name" span placeholder="e.g. Blue Dart Express Limited" value={f.account_holder} onChange={set('account_holder')} />
+                </Group>
 
-            <p className="text-xs text-muted leading-relaxed border-t border-line pt-4">
-              Used only to verify this vendor, deleted after 30 days. We never ask for personal ID numbers, home addresses or personal phone numbers.
-            </p>
+                <Group title="Contact person" note="We check that this person works at the company and that the email is at the company's domain.">
+                  <Field id="contact_name" label="Name" placeholder="e.g. Balfour John Manuel" value={f.contact_name} onChange={set('contact_name')} />
+                  <Field id="contact_designation" label="Designation" hint="compared with the person's listed title" placeholder="e.g. Managing Director" value={f.contact_designation} onChange={set('contact_designation')} />
+                  <Field id="contact_email" label="Work email" span type="email" placeholder="e.g. name@bluedart.com" value={f.contact_email} onChange={set('contact_email')} onBlur={touch('contact_email')} error={errs.contact_email} />
+                  <Field id="directors" label="Directors named on the vendor's application" hint="comma separated: checked against the official record" span placeholder="e.g. Balfour John Manuel" value={f.directors} onChange={set('directors')} />
+                </Group>
+              </div>
+            )}
           </div>
         ) : (
           <div>
@@ -229,7 +246,7 @@ function CheckForm() {
           </div>
         )}
         {err && <p role="alert" className="mt-4 text-sm text-bad">{err}</p>}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="sticky bottom-0 -mx-5 md:-mx-7 -mb-5 md:-mb-7 mt-6 px-5 md:px-7 py-4 bg-card border-t border-line rounded-b-xl flex flex-wrap items-center gap-3">
           <button className="btn-dark" disabled={busy}>{busy ? 'Starting' : 'Run the check'} <ArrowRight size={16} aria-hidden="true" /></button>
           <span className="text-sm text-muted">Nothing is sent until a person approves it.</span>
         </div>

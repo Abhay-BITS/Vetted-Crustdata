@@ -103,9 +103,11 @@ def create_run(req: RunRequest):
     body = {k: v for k, v in req.model_dump().items() if v}
     if not body:
         raise HTTPException(400, "send at least a vendor name, a website or free text")
+    from .privacy import protect_request
     batch_id, requests = expand(store, body)
     items = []
     for rq in requests:
+        rq = protect_request(rq)
         rid = new_run_id()
         store.create_run(rid, rq)
         items.append((rid, rq))
@@ -269,6 +271,7 @@ async def import_master(file: UploadFile):
 
 
 def import_vendor_master_csv(st: Store, text: str) -> int:
+    from .privacy import account_hash
     n = 0
     for row in csv.DictReader(io.StringIO(text)):
         row = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
@@ -276,7 +279,9 @@ def import_vendor_master_csv(st: Store, text: str) -> int:
         st.x("""INSERT OR REPLACE INTO vendor_master (vendor_id, legal_name, gstin, pan, cin, domain, bank_account,
                 ifsc, city, status, added_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
              (vid, row.get("legal_name") or row.get("name"), row.get("gstin"), row.get("pan"), row.get("cin"),
-              row.get("domain") or row.get("website"), row.get("bank_account"), row.get("ifsc"), row.get("city"),
+              row.get("domain") or row.get("website"),
+              row.get("bank_account") if str(row.get("bank_account") or "").startswith("h:") else account_hash(row.get("bank_account")),
+              row.get("ifsc"), row.get("city"),
               row.get("status") or "active", time.time()))
         n += 1
     return n

@@ -35,7 +35,7 @@ A request in either form:
 ```json
 {"vendor_name": "Blue Dart Express Limited", "website": "bluedart.com", "entity_type": "public limited",
  "cin": "optional", "llpin": "optional", "gstin": "optional", "pan": "optional", "udyam": "optional",
- "city": "optional", "registered_address": "optional", "pincode": "optional", "claimed_since": "optional year",
+ "city": "optional", "pincode": "optional", "claimed_since": "optional year",
  "bank_account": "optional", "ifsc": "optional", "account_holder": "optional",
  "contact_name": "optional", "contact_designation": "optional", "contact_email": "optional",
  "directors": ["optional, as named on the application"]}
@@ -183,6 +183,9 @@ UI development: `cd ui && npm install && npm run dev` (proxies `/api` to port 80
 - Every report carries a **Personal data used** record: each name and DIN, where it came from, why it was used, and
   that it is deleted after `privacy.retention_days` (30). `python -m vetted purge` enforces it.
 - Blocking an action needs a written reason, which is recorded and shared with the vendor.
+- Bank account numbers are never stored in full: only a one-way hash (used for the shared-account check) and the last 4 digits.
+- The form asks only for what a check uses. A name or a website is enough; everything else is optional and each optional
+  field is compared with a record.
 - **Only named approvers can decide.** Approvers and their PINs live in `.env` (`APPROVERS="Name:PIN,..."`); the PIN is
   checked on the server and every verdict is recorded with the approver's name, time and reason (the **Audit trail**).
 - **Agents write only to the team.** Email is sent through SMTP only to addresses on `policy.yaml` → `email.allow_domains`;

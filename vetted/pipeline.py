@@ -115,7 +115,8 @@ def step_intake(ctx: RunContext, state: dict) -> dict:
         "pan": (req.get("pan") or "").upper() or None,
         "city": req.get("city"),
         "directors": req.get("directors") or [],
-        "bank_account": req.get("bank_account"),
+        "bank_account_hash": req.get("bank_account_hash"),
+        "bank_account_last4": req.get("bank_account_last4"),
         "ifsc": (req.get("ifsc") or "").upper() or None,
         "account_holder": req.get("account_holder"),
         "entity_type": (req.get("entity_type") or "").lower() or None,
@@ -147,7 +148,7 @@ def step_duplicates(ctx: RunContext, state: dict) -> dict:
         if keys:
             exact.append({"vendor_id": r["vendor_id"], "legal_name": r["legal_name"], "matched_on": keys})
             continue
-        if v.get("bank_account") and r.get("bank_account") and v["bank_account"] == r["bank_account"]:
+        if v.get("bank_account_hash") and r.get("bank_account") and v["bank_account_hash"] == r["bank_account"]:
             shared_bank.append({"vendor_id": r["vendor_id"], "legal_name": r["legal_name"]})
         # strict: every word must match, so "Blue Dart" is not a duplicate of "Blue Dart Aviation"
         score = fuzz.token_sort_ratio(norm_name(v.get("vendor_name")), norm_name(r.get("legal_name")))
@@ -561,8 +562,13 @@ def step_claims(ctx: RunContext, state: dict) -> dict:
                                                                 v["contact_name"].lower()) >= th), None)
         if hit:
             title = (hit.get("basic_profile") or {}).get("current_title")
-            row("Contact person", f"{v['contact_name']}{', ' + v['contact_designation'] if v.get('contact_designation') else ''}",
-                f"{(hit.get('basic_profile') or {}).get('name')}, {title} at the company", "Crustdata /person/search", True)
+            row("Contact person", v["contact_name"], f"{(hit.get('basic_profile') or {}).get('name')} works at the company",
+                "Crustdata /person/search", True)
+            if v.get("contact_designation") and title:
+                ok = fuzz.token_set_ratio(v["contact_designation"].lower(), title.lower()) >= 60
+                row("Contact designation", v["contact_designation"], title, "Crustdata /person/search", ok)
+                if not ok:
+                    notes.append(f"{v['contact_name']} is listed as '{title}', not '{v['contact_designation']}'")
         elif r.ok:
             row("Contact person", v["contact_name"], "not found among the company's people", "Crustdata /person/search", None)
             notes.append(f"The contact person {v['contact_name']} was not found among the company's people in Crustdata "
