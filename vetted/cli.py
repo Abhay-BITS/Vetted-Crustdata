@@ -41,6 +41,16 @@ def main(argv=None) -> int:
     rs = sub.add_parser("resume")
     rs.add_argument("run_id")
     rs.add_argument("--md", action="store_true")
+    ac = sub.add_parser("actions")
+    ac.add_argument("--status")
+    ap = sub.add_parser("decide")
+    ap.add_argument("action_id")
+    ap.add_argument("verdict", choices=["approve", "hold", "block"])
+    ap.add_argument("--approver", required=True)
+    ap.add_argument("--reason", default="")
+    sub.add_parser("execute")
+    mi = sub.add_parser("import-master")
+    mi.add_argument("csv_file")
     sh = sub.add_parser("show")
     sh.add_argument("run_id")
     sh.add_argument("--md", action="store_true")
@@ -56,6 +66,20 @@ def main(argv=None) -> int:
                                      "directors": args.director, "bank_account": args.bank_account,
                                      "ifsc": args.ifsc, "text": args.text}.items() if v}
         res = run(req, run_id=args.run_id, on_step=_print_step)
+    elif args.cmd in ("actions", "decide", "execute", "import-master"):
+        from . import actions as act
+        st = Store()
+        if args.cmd == "actions":
+            out = act.list_actions(st, status=args.status)
+        elif args.cmd == "decide":
+            out = act.decide_action(st, args.action_id, args.verdict, args.approver, args.reason)
+        elif args.cmd == "execute":
+            out = act.execute_approved(st)
+        else:
+            from .api import import_vendor_master_csv
+            out = {"imported": import_vendor_master_csv(st, open(args.csv_file).read())}
+        print(json.dumps(out, indent=2, default=str))
+        return 0
     elif args.cmd == "resume":
         res = run({}, run_id=args.run_id, on_step=_print_step)
     else:

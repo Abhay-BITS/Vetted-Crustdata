@@ -67,5 +67,9 @@ def run(request: dict, run_id: str | None = None, store: Store | None = None, on
 
     result = build_result(ctx, state, stopped)
     store.finish_run(run_id, "stopped" if stopped else "done", result)
+    from .actions import propose_actions
+    result["actions"] = [{"action_id": a["action_id"], "kind": a["kind"], "status": a["status"]}
+                         for a in propose_actions(store, result, request)]
+    store.finish_run(run_id, "stopped" if stopped else "done", result)
     ctx.log("run_end", decision=result["decision"], cost=result["cost"])
     return result
