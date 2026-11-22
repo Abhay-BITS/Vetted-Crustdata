@@ -33,9 +33,12 @@ business checked**. It takes days per vendor and holds up the first dispatch.
 A request in either form:
 
 ```json
-{"vendor_name": "Blue Dart Express Limited", "website": "bluedart.com",
- "cin": "optional", "gstin": "optional", "pan": "optional", "city": "optional",
- "directors": ["optional"], "bank_account": "optional", "ifsc": "optional", "contact_email": "optional"}
+{"vendor_name": "Blue Dart Express Limited", "website": "bluedart.com", "entity_type": "public limited",
+ "cin": "optional", "llpin": "optional", "gstin": "optional", "pan": "optional", "udyam": "optional",
+ "city": "optional", "registered_address": "optional", "pincode": "optional", "claimed_since": "optional year",
+ "bank_account": "optional", "ifsc": "optional", "account_holder": "optional",
+ "contact_name": "optional", "contact_designation": "optional", "contact_email": "optional",
+ "directors": ["optional, as named on the application"]}
 ```
 
 several vendors at once:
@@ -61,6 +64,11 @@ One decision per vendor, the four answers, and the evidence:
 | `REJECTED` | The registry says no (e.g. Strike Off, Dissolved) | Approves the notice to the vendor |
 | `REFER` | Red flags: lookalike name, shared bank account, bad GSTIN, adverse news naming a director with the company | Reviews before money moves |
 | `CANNOT_VERIFY` | No record settles it. The output **names what is missing** | Asks the vendor for it |
+
+**Claimed vs record.** Everything the vendor claims is compared with a record and shown side by side: contact email domain
+(free mailboxes and other domains are flagged), whether the contact person works at the company (Crustdata Person Search),
+"in business since" against the incorporation date, PIN code against the MCA registered address, bank account holder against
+the legal name, PAN against the GSTIN, and the Udyam (MSME) number format (MSME vendors must be paid within 45 days).
 
 The four answers the client asked for: **real and trading?**, **who runs it?** (directors with DIN, confirmed at the company
 where Crustdata shows their current role there), **how long has it existed?** (incorporation date) and **anything off?**

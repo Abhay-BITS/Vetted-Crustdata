@@ -11,7 +11,7 @@ from .report import build_result
 from .store import Store
 
 
-PAID_STEPS = {"resolve", "profile", "registry", "website", "ids", "directors", "adverse"}
+PAID_STEPS = {"resolve", "profile", "registry", "website", "ids", "directors", "claims", "adverse"}
 
 
 def new_run_id() -> str:

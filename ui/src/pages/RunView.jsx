@@ -7,6 +7,7 @@ import { RunScene } from '../scenes'
 import { useCountUp } from '../motion'
 
 const STEP_LABEL = {
+  claims: 'Claims vs record',
   intake: 'Read the request', duplicates: 'Check the vendor master', resolve: 'Find the company',
   profile: 'Company profile', registry: 'Registry record', website: 'Website check', ids: 'Tax ID and bank',
   directors: 'Who runs it', adverse: 'News screen', facts: 'Source check', decide: 'Decision',
@@ -196,7 +197,7 @@ function Report({ r }) {
       {['CANNOT_VERIFY', 'REFER'].includes(r.decision) && (
         <button className="btn-soft mt-6" onClick={() => {
           const q = r.request || {}
-          sessionStorage.setItem('vetted.prefill', JSON.stringify({ vendor_name: q.vendor_name || r.vendor || '', website: q.website || '', cin: q.cin || '', gstin: q.gstin || '', city: q.city || '', directors: q.directors || [], contact_email: q.contact_email || '' }))
+          sessionStorage.setItem('vetted.prefill', JSON.stringify({ ...q, vendor_name: q.vendor_name || r.vendor || '', directors: q.directors || [] }))
           window.location.hash = '#/'
         }}>Add the missing details and check again <ArrowDownRight size={16} aria-hidden="true" /></button>
       )}
@@ -207,6 +208,34 @@ function Report({ r }) {
           {r.missing?.length > 0 && <List title="Cannot verify: what is missing" items={r.missing} />}
           {r.notes?.length > 0 && <List title="Notes" items={r.notes} />}
         </div>
+      )}
+
+      {r.claims?.length > 0 && (
+        <section className="panel mt-12 p-2 md:p-3" aria-labelledby="claims-h">
+          <div className="px-4 pt-4 pb-3">
+            <h2 id="claims-h" className="text-xl">What the vendor claimed, against the record</h2>
+          </div>
+          <div className="frame overflow-x-auto" data-lenis-prevent>
+            <table className="w-full text-sm table-fixed min-w-[620px]">
+              <colgroup><col className="w-[22%]" /><col className="w-[28%]" /><col className="w-[30%]" /><col className="w-[20%]" /></colgroup>
+              <thead className="text-left text-muted border-b border-line">
+                <tr>{['Field', 'Claimed', 'Record', 'Result'].map(h => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
+              </thead>
+              <tbody className="stagger">
+                {r.claims.map((c, i) => (
+                  <tr key={i} className={`border-b border-line last:border-0 align-top ${c.match === false ? 'bg-bad-bg' : ''}`}>
+                    <td className="px-4 py-3 font-medium">{c.field}</td>
+                    <td className="px-4 py-3 break-words">{c.claimed}</td>
+                    <td className="px-4 py-3 break-words">{c.record}<span className="block text-xs text-muted">{c.source}</span></td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {c.match === true ? <span className="text-ok font-medium">Matches</span> : c.match === false ? <span className="text-bad font-medium">Does not match</span> : <span className="text-muted">Could not confirm</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {r.personal_data && (

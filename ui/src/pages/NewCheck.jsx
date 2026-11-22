@@ -3,9 +3,22 @@ import { ArrowDownRight, ArrowRight } from 'lucide-react'
 import { api } from '../api'
 import Frieze from '../Frieze'
 import { useReveal, scrollToId } from '../motion'
+import { check, isWarning } from '../validate'
 import { DecisionBadge, DECISIONS, Section, inr } from '../ui'
 
-const EMPTY = { vendor_name: '', website: '', cin: '', gstin: '', city: '', directors: '', contact_email: '' }
+const EMPTY = {
+  vendor_name: '', website: '', entity_type: '', city: '', cin: '', llpin: '', gstin: '', pan: '', udyam: '',
+  registered_address: '', pincode: '', bank_account: '', ifsc: '', account_holder: '',
+  contact_name: '', contact_designation: '', contact_email: '', claimed_since: '', directors: '',
+}
+
+const SAMPLES = [
+  { label: 'Real carrier', data: { vendor_name: 'Delhivery Limited', website: 'delhivery.com', entity_type: 'public limited', city: 'New Delhi', claimed_since: '2011', pincode: '110037' } },
+  { label: 'Lookalike website', data: { vendor_name: 'Delhivery Limited', website: 'delhlvery.com', entity_type: 'public limited', contact_name: 'Ravi Kumar', contact_email: 'ravi.delhivery@gmail.com', claimed_since: '2005' } },
+  { label: 'Struck-off company', data: { vendor_name: 'Sharma Roadlines Private Limited', cin: 'U60220MH1989PTC051044', entity_type: 'private limited' } },
+  { label: 'Bad bank details', data: { vendor_name: 'Blue Dart Express Limited', website: 'bluedart.com', entity_type: 'public limited', gstin: '07AAACB0446L1ZX', ifsc: 'ABCD0123456', bank_account: '50100012345678', account_holder: 'Sharma Traders' } },
+  { label: 'Small transporter', data: { vendor_name: 'Sharma Roadlines', entity_type: 'proprietorship', city: 'Jaipur' } },
+]
 
 export default function NewCheck() {
   const [stats, setStats] = useState(null)
@@ -112,7 +125,7 @@ function CheckForm() {
   const [f, setF] = useState(() => {
     try {
       const pre = JSON.parse(sessionStorage.getItem('vetted.prefill') || 'null')
-      if (pre) { sessionStorage.removeItem('vetted.prefill'); setTimeout(() => scrollToId('check'), 400); return { ...EMPTY, ...pre, directors: (pre.directors || []).join(', ') } }
+      if (pre) { sessionStorage.removeItem('vetted.prefill'); setTimeout(() => scrollToId('check'), 400); return { ...EMPTY, ...pre, directors: Array.isArray(pre.directors) ? pre.directors.join(', ') : (pre.directors || '') } }
     } catch {}
     return EMPTY
   })
@@ -120,10 +133,13 @@ function CheckForm() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const set = k => e => setF({ ...f, [k]: e.target.value })
+  const errs = Object.fromEntries(Object.keys(EMPTY).map(k => [k, check(k, f[k], f)]))
+  const hasErrors = Object.values(errs).some(m => m && !isWarning(m))
 
   async function submit(e) {
     e.preventDefault()
     setErr('')
+    if (mode === 'form' && hasErrors) { setErr('Fix the highlighted fields first.'); return }
     const body = mode === 'text'
       ? { text }
       : Object.fromEntries(Object.entries({ ...f, directors: f.directors ? f.directors.split(',').map(s => s.trim()).filter(Boolean) : null }).filter(([, v]) => v && (!Array.isArray(v) || v.length)))
@@ -149,14 +165,60 @@ function CheckForm() {
       </div>
       <div className="p-5 md:p-7">
         {mode === 'form' ? (
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field id="vendor_name" label="Vendor name" span placeholder="Blue Dart Express Limited" value={f.vendor_name} onChange={set('vendor_name')} />
-            <Field id="website" label="Website" placeholder="bluedart.com" value={f.website} onChange={set('website')} />
-            <Field id="city" label="City" placeholder="Mumbai" value={f.city} onChange={set('city')} />
-            <Field id="cin" label="CIN" hint="if known" mono placeholder="L61074MH1991PLC061074" value={f.cin} onChange={set('cin')} />
-            <Field id="gstin" label="GSTIN" hint="if known" mono placeholder="27AAACB0446L1ZS" value={f.gstin} onChange={set('gstin')} />
-            <Field id="directors" label="Directors named on the vendor's application" hint="optional, comma separated: checked against the official record" span placeholder="Balfour John Manuel" value={f.directors} onChange={set('directors')} />
-            <Field id="contact_email" label="Vendor contact email" hint="a teammate's inbox in the demo" span type="email" placeholder="vendor-desk@example.test" value={f.contact_email} onChange={set('contact_email')} />
+          <div className="space-y-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted mr-1">Try a sample:</span>
+              {SAMPLES.map(x => (
+                <button key={x.label} type="button" className="h-8 px-3 rounded-full bg-soft text-[13px] font-medium hover:bg-line transition"
+                        onClick={() => setF({ ...EMPTY, ...x.data })}>{x.label}</button>
+              ))}
+            </div>
+
+            <Group title="Company">
+              <Field id="vendor_name" label="Vendor name" span placeholder="Blue Dart Express Limited" value={f.vendor_name} onChange={set('vendor_name')} />
+              <Field id="website" label="Website" placeholder="bluedart.com" value={f.website} onChange={set('website')} error={errs.website} />
+              <div>
+                <label className="label" htmlFor="entity_type">Type of business</label>
+                <select id="entity_type" className="field" value={f.entity_type} onChange={set('entity_type')}>
+                  <option value="">Not sure</option>
+                  <option value="public limited">Public limited company</option>
+                  <option value="private limited">Private limited company</option>
+                  <option value="llp">LLP</option>
+                  <option value="partnership">Partnership firm</option>
+                  <option value="proprietorship">Proprietorship</option>
+                </select>
+              </div>
+              <Field id="city" label="City" placeholder="Mumbai" value={f.city} onChange={set('city')} />
+              <Field id="claimed_since" label="In business since" hint="year the vendor says" placeholder="1991" value={f.claimed_since} onChange={set('claimed_since')} error={errs.claimed_since} />
+            </Group>
+
+            <Group title="Tax and registration" note="Checked against the MCA record and the GSTIN's own structure.">
+              {f.entity_type === 'llp'
+                ? <Field id="llpin" label="LLPIN" mono placeholder="AAB-1234" value={f.llpin} onChange={set('llpin')} error={errs.llpin} />
+                : <Field id="cin" label="CIN" mono placeholder="L61074MH1991PLC061074" value={f.cin} onChange={set('cin')} error={errs.cin} />}
+              <Field id="gstin" label="GSTIN" mono placeholder="27AAACB0446L1ZS" value={f.gstin} onChange={set('gstin')} error={errs.gstin} />
+              <Field id="pan" label="PAN" mono placeholder="AAACB0446L" value={f.pan} onChange={set('pan')} error={errs.pan} />
+              <Field id="udyam" label="Udyam (MSME) number" hint="if an MSME" mono placeholder="UDYAM-MH-02-0012345" value={f.udyam} onChange={set('udyam')} error={errs.udyam} />
+              <Field id="registered_address" label="Registered office address" span placeholder="Andheri (East), Mumbai, Maharashtra" value={f.registered_address} onChange={set('registered_address')} />
+              <Field id="pincode" label="PIN code" placeholder="400099" value={f.pincode} onChange={set('pincode')} error={errs.pincode} />
+            </Group>
+
+            <Group title="Bank" note="The IFSC is looked up live; the account holder must be the company itself.">
+              <Field id="bank_account" label="Account number" mono placeholder="50100012345678" value={f.bank_account} onChange={set('bank_account')} error={errs.bank_account} />
+              <Field id="ifsc" label="IFSC" mono placeholder="HDFC0000001" value={f.ifsc} onChange={set('ifsc')} error={errs.ifsc} />
+              <Field id="account_holder" label="Account holder name" span placeholder="Blue Dart Express Limited" value={f.account_holder} onChange={set('account_holder')} />
+            </Group>
+
+            <Group title="Contact person" note="We check that this person works at the company and that the email is at the company's domain.">
+              <Field id="contact_name" label="Name" placeholder="Balfour John Manuel" value={f.contact_name} onChange={set('contact_name')} />
+              <Field id="contact_designation" label="Designation" placeholder="Managing Director" value={f.contact_designation} onChange={set('contact_designation')} />
+              <Field id="contact_email" label="Work email" hint="approved emails go here only if it is a teammate's inbox" span type="email" placeholder="name@bluedart.com" value={f.contact_email} onChange={set('contact_email')} error={errs.contact_email} />
+              <Field id="directors" label="Directors named on the vendor's application" hint="optional, comma separated: checked against the official record" span placeholder="Balfour John Manuel" value={f.directors} onChange={set('directors')} />
+            </Group>
+
+            <p className="text-xs text-muted leading-relaxed border-t border-line pt-4">
+              Used only to verify this vendor, deleted after 30 days. We never ask for personal ID numbers, home addresses or personal phone numbers.
+            </p>
           </div>
         ) : (
           <div>
@@ -176,11 +238,23 @@ function CheckForm() {
   )
 }
 
-function Field({ id, label, hint, span, mono, ...rest }) {
+function Group({ title, note, children }) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">{title}</legend>
+      {note && <p className="text-xs text-muted mt-0.5">{note}</p>}
+      <div className="grid sm:grid-cols-2 gap-4 mt-3">{children}</div>
+    </fieldset>
+  )
+}
+
+function Field({ id, label, hint, span, mono, error, ...rest }) {
   return (
     <div className={span ? 'sm:col-span-2' : ''}>
       <label className="label" htmlFor={id}>{label}{hint && <span className="text-muted font-normal"> ({hint})</span>}</label>
-      <input id={id} className={`field ${mono ? 'font-mono text-[13px] uppercase' : ''}`} {...rest} />
+      <input id={id} aria-invalid={!!error} aria-describedby={error ? `${id}-err` : undefined}
+             className={`field ${mono ? 'font-mono text-[13px] uppercase' : ''} ${error ? (isWarning(error) ? '!border-warn !bg-warn-bg' : '!border-bad !bg-bad-bg') : ''}`} {...rest} />
+      {error && <p id={`${id}-err`} className={`text-xs mt-1.5 pop ${isWarning(error) ? 'text-warn' : 'text-bad'}`}>{isWarning(error) ? `${error}. You can still submit; the check will record it.` : error}</p>}
     </div>
   )
 }

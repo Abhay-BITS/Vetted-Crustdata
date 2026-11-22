@@ -117,6 +117,16 @@ def step_intake(ctx: RunContext, state: dict) -> dict:
         "directors": req.get("directors") or [],
         "bank_account": req.get("bank_account"),
         "ifsc": (req.get("ifsc") or "").upper() or None,
+        "account_holder": req.get("account_holder"),
+        "entity_type": (req.get("entity_type") or "").lower() or None,
+        "llpin": (req.get("llpin") or "").upper() or None,
+        "udyam": (req.get("udyam") or "").upper() or None,
+        "claimed_since": str(req.get("claimed_since") or "").strip() or None,
+        "registered_address": req.get("registered_address"),
+        "pincode": str(req.get("pincode") or "").strip() or None,
+        "contact_name": req.get("contact_name"),
+        "contact_designation": req.get("contact_designation"),
+        "contact_email": (req.get("contact_email") or "").strip().lower() or None,
         "parsed_by": parsed_by,
         "missing": missing,
     }
@@ -507,6 +517,106 @@ def step_directors(ctx: RunContext, state: dict) -> dict:
     return {"directors": rows, "claimed": claimed_check, "registry_has_directors": bool(directors)}
 
 
+# --------------------------------------------------------------------------- step 6a: what the vendor claims vs the record
+FREE_MAIL = {"gmail.com", "yahoo.com", "yahoo.co.in", "outlook.com", "hotmail.com", "rediffmail.com", "icloud.com",
+             "proton.me", "protonmail.com", "aol.com", "live.com", "ymail.com", "zoho.com"}
+UDYAM_RE = re.compile(r"^UDYAM-[A-Z]{2}-\d{2}-\d{7}$")
+
+
+def step_claims(ctx: RunContext, state: dict) -> dict:
+    """Compare each thing the vendor claimed with the record. Mismatches become flags; matches become facts."""
+    v, prof, reg = state["intake"], state.get("profile") or {}, state.get("registry") or {}
+    insta = ((reg.get("pages") or {}).get("instafinancials") or {}).get("fields") or {}
+    legal = (insta.get("legal_name") or {}).get("value") or prof.get("name")
+    addr = (insta.get("registered_address") or {}).get("value") or ""
+    inc = (insta.get("incorporation_date") or {}).get("value")
+    th = ctx.policy["matching"]["person_name_threshold"]
+    rows, flags, notes = [], [], []
+
+    def row(field, claimed, record, source, match):
+        rows.append({"field": field, "claimed": claimed, "record": record, "source": source, "match": match})
+
+    # contact email: free mail, or a domain that is not the company's
+    if v.get("contact_email") and "@" in v["contact_email"]:
+        dom = v["contact_email"].split("@")[-1]
+        company_domains = {d for d in [v.get("domain"), prof.get("domain"), domain_of((insta.get("website") or {}).get("value", "").split(":")[0])] if d}
+        company_domains |= set(((state.get("resolve") or {}).get("company") or {}).get("all_domains") or [])
+        is_company = (v.get("entity_type") or "company") not in ("proprietorship", "partnership")
+        if dom in FREE_MAIL and is_company:
+            row("Contact email", v["contact_email"], ", ".join(sorted(company_domains)) or "company domain unknown", "domain comparison", False)
+            flags.append(f"The contact email {v['contact_email']} is a free mailbox, not an address at the company")
+        elif company_domains and dom not in company_domains and not any(dom.endswith("." + d) for d in company_domains):
+            team = [d.lower() for d in ctx.policy.get("email", {}).get("allow_domains", [])]
+            if dom not in team:  # the demo routes vendor mail to a teammate's inbox; do not flag that
+                row("Contact email", v["contact_email"], ", ".join(sorted(company_domains)), "domain comparison", False)
+                flags.append(f"The contact email domain {dom} does not match the company's website ({', '.join(sorted(company_domains))})")
+        elif company_domains:
+            row("Contact email", v["contact_email"], ", ".join(sorted(company_domains)), "domain comparison", True)
+
+    # contact person: do they work at the company? (Crustdata Person Search)
+    if v.get("contact_name") and prof.get("company_id"):
+        r = CrustdataClient(ctx).person_at_company(v["contact_name"], prof["company_id"])
+        profs = (r.data or {}).get("profiles", []) if r.ok and isinstance(r.data, dict) else []
+        hit = next((p_ for p_ in profs if fuzz.token_sort_ratio(((p_.get("basic_profile") or {}).get("name") or "").lower(),
+                                                                v["contact_name"].lower()) >= th), None)
+        if hit:
+            title = (hit.get("basic_profile") or {}).get("current_title")
+            row("Contact person", f"{v['contact_name']}{', ' + v['contact_designation'] if v.get('contact_designation') else ''}",
+                f"{(hit.get('basic_profile') or {}).get('name')}, {title} at the company", "Crustdata /person/search", True)
+        elif r.ok:
+            row("Contact person", v["contact_name"], "not found among the company's people", "Crustdata /person/search", None)
+            notes.append(f"The contact person {v['contact_name']} was not found among the company's people in Crustdata "
+                         f"(common for small teams; a person should confirm)")
+
+    # "in business since" vs incorporation
+    if v.get("claimed_since") and inc and parse_date(inc):
+        try:
+            claimed = int(re.findall(r"\d{4}", v["claimed_since"])[0])
+            inc_year = parse_date(inc).year
+            ok = claimed >= inc_year - 1
+            row("In business since", str(claimed), f"incorporated {inc}", "MCA company record", ok)
+            if not ok:
+                flags.append(f"Claims to be in business since {claimed}, but the company was incorporated on {inc}")
+        except (IndexError, ValueError):
+            pass
+
+    # registered address / PIN code vs the MCA record
+    if (v.get("pincode") or v.get("registered_address")) and addr:
+        rec_pins = re.findall(r"\b\d{6}\b", addr)
+        if v.get("pincode") and rec_pins:
+            ok = v["pincode"] in rec_pins
+            row("Registered office PIN code", v["pincode"], rec_pins[0], "MCA company record", ok)
+            if not ok:
+                flags.append(f"Registered office PIN code {v['pincode']} does not match the MCA record ({rec_pins[0]})")
+        elif v.get("registered_address"):
+            sim = fuzz.token_set_ratio(v["registered_address"].lower(), addr.lower())
+            row("Registered office", v["registered_address"], addr, "MCA company record", sim >= 70)
+            if sim < 50:
+                flags.append("The registered office address given does not match the MCA record")
+
+    # account holder vs legal name
+    if v.get("account_holder") and legal:
+        sim = fuzz.token_sort_ratio(norm_name(v["account_holder"]), norm_name(legal))
+        row("Bank account holder", v["account_holder"], legal, "MCA company record (legal name)", sim >= 85)
+        if sim < 85:
+            flags.append(f"The bank account holder '{v['account_holder']}' is not the company's legal name ({legal})")
+
+    # PAN vs GSTIN (the GSTIN structure check itself lives in step_ids)
+    if v.get("pan") and v.get("gstin") and len(v["gstin"]) == 15:
+        row("PAN", v["pan"], f"{v['gstin'][2:12]} (inside the GSTIN)", "GSTIN structure", v["pan"] == v["gstin"][2:12])
+
+    # MSME (Udyam): format check + the payment-terms note
+    if v.get("udyam"):
+        ok = bool(UDYAM_RE.match(v["udyam"]))
+        row("Udyam (MSME) number", v["udyam"], "valid format" if ok else "not a valid Udyam number", "format check", ok)
+        if ok:
+            notes.append("MSME vendor: under the MSMED Act it must be paid within 45 days of acceptance")
+        else:
+            flags.append(f"{v['udyam']} is not a valid Udyam (MSME) registration number")
+
+    return {"rows": rows, "flags": flags, "notes": notes}
+
+
 # --------------------------------------------------------------------------- step 6b: adverse media
 ADVERSE_WORDS = ["fraud", "arrest", "arrested", "scam", "cheating", "cheated", "fir ", "f.i.r", "money laundering",
                  "raid", "raided", "absconding", "default", "defaulter", "wilful", "embezzle", "forgery", "fake",
@@ -735,6 +845,9 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
             flags.append(f"Claimed director {c['name']} is not on the registry record")
     id_flags = (state.get("ids") or {}).get("flags") or []
     flags += id_flags
+    claim_flags = (state.get("claims") or {}).get("flags") or []
+    flags += claim_flags
+    notes += (state.get("claims") or {}).get("notes") or []
     notes += (state.get("ids") or {}).get("notes") or []
     adverse_confirmed = []
     for s in (state.get("adverse") or {}).get("screened", []):
@@ -766,6 +879,8 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
         missing.append(f"the vendor's CIN, website or city, to confirm it is {pm['legal_name']} (CIN {pm['cin']}, "
                        f"registry status {pm.get('status')}) and not another business with a similar name")
         notes.append(f"Possible registry match, not confirmed: {pm['legal_name']} (CIN {pm['cin']}, status {pm.get('status')})")
+    elif not reg.get("cin") and v.get("entity_type") in ("proprietorship", "partnership"):
+        missing.append(f"a GST registration record (a {v['entity_type']} is not on the MCA company register)")
     elif not reg.get("cin"):
         if reg.get("unavailable"):
             missing.append("company-registry record (registry source did not respond; this is not proof it is missing)")
@@ -788,7 +903,7 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     elif status and status.lower() != "active":
         decision = "REFER"
         reasons.append(f"Registry status is '{status}', not Active: a person decides")
-    elif res.get("lookalike") or dup.get("shared_bank") or id_flags or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
+    elif res.get("lookalike") or dup.get("shared_bank") or id_flags or claim_flags or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
         decision = "REFER"
         reasons.append("Red flags need a person: " + "; ".join(flags))
     elif not reg.get("cin") and pol["decision"]["cannot_verify_without_registry"]:
@@ -848,8 +963,12 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
         ask("Your official website and CIN, so we can confirm we are dealing with the right company")
     if any("GSTIN" in f for f in flags):
         ask("A copy of your GST registration certificate")
-    if any("IFSC" in f for f in flags) or dup.get("shared_bank"):
+    if any("contact email" in f.lower() for f in flags):
+        ask("A letter on company letterhead naming your contact person, sent from an address at your company's domain")
+    if any("IFSC" in f for f in flags) or dup.get("shared_bank") or any("account holder" in f for f in flags):
         ask("A cancelled cheque or a bank letter confirming the account number, IFSC and account holder name")
+    if any("PIN code" in f or "registered office address" in f for f in flags):
+        ask("Your registered office address as filed with the Ministry of Corporate Affairs")
     if any("not on the registry record" in f for f in flags):
         ask("The current list of directors as filed with the Ministry of Corporate Affairs")
     if not res.get("lookalike") and (any("less than" in f and "months ago" in f for f in flags)
@@ -871,7 +990,7 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
                      "not_collected": "personal emails, phone numbers, home addresses, photos"}
 
     return {"decision": decision, "reasons": reasons, "flags": flags, "notes": notes, "missing": missing,
-            "documents_to_request": docs,
+            "documents_to_request": docs, "claims": (state.get("claims") or {}).get("rows", []),
             "signals": signals, "legal_name": legal, "status": status, "personal_data": personal_data,
             "answers": {"real_and_trading": real, "who_runs_it": who, "how_long_it_has_existed": how_long,
                         "anything_off": flags or ["Nothing found"]}}
@@ -886,6 +1005,7 @@ STEPS = [
     ("website", step_website),
     ("ids", step_ids),
     ("directors", step_directors),
+    ("claims", step_claims),
     ("adverse", step_adverse),
     ("facts", step_facts),
     ("decide", step_decide),

@@ -74,6 +74,15 @@ class RunRequest(BaseModel):
     bank_account: str | None = None
     ifsc: str | None = None
     contact_email: str | None = None
+    contact_name: str | None = None
+    contact_designation: str | None = None
+    account_holder: str | None = None
+    entity_type: str | None = None
+    llpin: str | None = None
+    udyam: str | None = None
+    claimed_since: str | None = None
+    registered_address: str | None = None
+    pincode: str | None = None
     text: str | None = None
 
 

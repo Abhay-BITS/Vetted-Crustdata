@@ -30,6 +30,7 @@ def build_result(ctx: RunContext, state: dict, stopped: str | None) -> dict:
         "notes": d.get("notes", []),
         "missing": missing,
         "documents_to_request": d.get("documents_to_request", []),
+        "claims": d.get("claims", []),
         "personal_data": d.get("personal_data"),
         "events": ctx.store.events_for(ctx.run_id),
         "facts": [{**f, "citation": cite(f)} for f in facts if f["verified"]],
