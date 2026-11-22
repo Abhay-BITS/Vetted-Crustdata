@@ -25,7 +25,7 @@ business checked**. It takes days per vendor and holds up the first dispatch.
 |---|---|
 | **Buyer** | Head of Procurement / Vendor Management, or Head of Compliance, at the 3PL |
 | **Price** | **₹999 per vendor processed**, whatever the outcome (a flat fee, so the service has no reason to clear a vendor it shouldn't) |
-| **Measured cost per job** | **₹37–39** for a full uncached check (4.4–4.6 Crustdata credits); exact duplicates cost ₹0, repeat lookups are cached at ₹0. Every call is in the cost ledger. |
+| **Measured cost per job** | **About ₹28 on average, ₹37–39 for a large company** (full cost with nothing cached, from the cost ledger); about 60–95 s per vendor. Exact duplicates cost ₹0. The ledger keeps both the full cost and what was actually paid after cache reuse. |
 | **Credit → ₹ assumption** | ₹8.5 per credit (≈ $0.10 at ≈ ₹85/$), set in `policy.yaml` → `pricing.inr_per_credit` |
 
 ## Input
@@ -38,7 +38,13 @@ A request in either form:
  "directors": ["optional"], "bank_account": "optional", "ifsc": "optional", "contact_email": "optional"}
 ```
 
-or free text, exactly as the client wrote it:
+several vendors at once:
+
+```json
+{"vendors": [{"vendor_name": "Delhivery Limited", "website": "delhivery.com"}, {"vendor_name": "VRL Logistics Limited", "website": "vrlgroup.in"}]}
+```
+
+or free text, exactly as the client wrote it (one vendor or several; several are split and checked one after another):
 
 ```json
 {"text": "Here is a new vendor's name and website: ... Tell me whether it is a real, trading business: who runs it, how long it has existed, and anything that looks off."}
@@ -128,6 +134,9 @@ cp .env.example .env          # add CRUSTDATA_API_KEY and (optional) GROQ_API_KE
 .venv/bin/python -m vetted decide <action_id> approve --approver "Your Name"
 .venv/bin/python -m vetted execute
 .venv/bin/python -m vetted import-master clients_vendor_master.csv
+.venv/bin/python -m vetted run --file batch.json        # {"vendors": [...]}
+.venv/bin/python -m vetted purge                         # delete runs older than privacy.retention_days
+.venv/bin/python -m vetted reset                         # clear demo runs and actions (keeps the cache)
 
 # tests
 .venv/bin/python -m tests.evaluate            # pass rate on tests/cases.json
@@ -156,11 +165,15 @@ UI development: `cd ui && npm install && npm run dev` (proxies `/api` to port 80
 - A small business with little online presence gets `CANNOT_VERIFY` and a list of documents to send, never a rejection.
 - Every rejection, every email and every change to the vendor master waits for a named person. The vendor is told why and can reply.
 - Emails go to the address entered for the demo (a teammate), never to a real vendor.
+- Every report carries a **Personal data used** record: each name and DIN, where it came from, why it was used, and
+  that it is deleted after `privacy.retention_days` (30). `python -m vetted purge` enforces it.
+- Blocking an action needs a written reason, which is recorded and shared with the vendor.
 
 ## Requirement changes
 
 Thresholds, limits, pricing, the decision rules and the output fields live in [`policy.yaml`](policy.yaml), which is re-read
-on every run. Each check is a step function in `vetted/pipeline.py`, so a new check is one function plus one line in `STEPS`.
+on every run. `simulate.unavailable: ["registry"]` (or `["web"]`) makes that source time out, to show that a slow source is
+reported as *did not respond*, never as *no record*. Each check is a step function in `vetted/pipeline.py`, so a new check is one function plus one line in `STEPS`.
 
 ## Repository
 
