@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ShieldCheck, Plus, Inbox, ListChecks, Building2 } from 'lucide-react'
+import { ArrowDownRight } from 'lucide-react'
 import { api } from './api'
+import { Mark, Ship } from './Art'
 import NewCheck from './pages/NewCheck'
 import RunView from './pages/RunView'
 import Approvals from './pages/Approvals'
@@ -8,9 +9,9 @@ import Checks from './pages/Checks'
 import Vendors from './pages/Vendors'
 
 function useHash() {
-  const [hash, setHash] = useState(window.location.hash || '#/new')
+  const [hash, setHash] = useState(window.location.hash || '#/')
   useEffect(() => {
-    const on = () => setHash(window.location.hash || '#/new')
+    const on = () => { setHash(window.location.hash || '#/'); window.__lenis ? window.__lenis.scrollTo(0, { immediate: true }) : window.scrollTo(0, 0) }
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
@@ -20,54 +21,68 @@ function useHash() {
 export default function App() {
   const hash = useHash()
   const [pending, setPending] = useState(0)
+  const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
     let alive = true
     const tick = () => api.summary().then(s => alive && setPending(s.pending_approvals)).catch(() => {})
     tick()
     const t = setInterval(tick, 3000)
-    return () => { alive = false; clearInterval(t) }
+    const onScroll = () => setScrolled(window.scrollY > 24)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { alive = false; clearInterval(t); window.removeEventListener('scroll', onScroll) }
   }, [])
 
   const [, route, arg] = hash.split('/')
   const nav = [
-    { href: '#/new', key: 'new', label: 'New check', Icon: Plus },
-    { href: '#/approvals', key: 'approvals', label: 'Approvals', Icon: Inbox, count: pending },
-    { href: '#/checks', key: 'checks', label: 'Checks', Icon: ListChecks },
-    { href: '#/vendors', key: 'vendors', label: 'Vendor master', Icon: Building2 },
+    { href: '#/approvals', key: 'approvals', label: 'Approvals', count: pending },
+    { href: '#/checks', key: 'checks', label: 'Checks' },
+    { href: '#/vendors', key: 'vendors', label: 'Vendor master' },
   ]
   const active = route === 'run' ? 'checks' : route
 
   let page
-  if (route === 'run' && arg) page = <RunView runId={arg} />
+  if (route === 'run' && arg) page = <RunView key={arg} runId={arg} />
   else if (route === 'approvals') page = <Approvals />
   else if (route === 'checks') page = <Checks />
   else if (route === 'vendors') page = <Vendors />
   else page = <NewCheck />
 
   return (
-    <div className="min-h-screen md:flex">
-      <aside className="md:w-60 md:min-h-screen md:fixed md:inset-y-0 border-b md:border-b-0 md:border-r border-line bg-surface">
-        <div className="px-5 h-16 flex items-center gap-2.5 border-b border-line">
-          <span className="w-8 h-8 rounded bg-accent text-white grid place-items-center"><ShieldCheck size={18} aria-hidden="true" /></span>
-          <span className="font-semibold text-[17px]">Vetted</span>
+    <div className="min-h-svh flex flex-col">
+      <header className="fixed top-0 inset-x-0 z-40 pointer-events-none">
+        <div className="wrap flex items-center justify-between gap-3 pt-2.5">
+          <a href="#/" className={`pointer-events-auto flex items-center gap-2.5 rounded p-1 pr-3.5 bg-soft transition-shadow ${scrolled ? 'shadow-float' : ''}`} aria-label="Vetted, home">
+            <span className="w-8 h-8 rounded-[8px] bg-card grid place-items-center text-ink shadow-[0_1px_2px_oklch(0.289_0_0/.08)]"><Mark size={20} /></span>
+            <span className="text-sm font-medium">Vetted</span>
+          </a>
+          <nav aria-label="Main" className={`pointer-events-auto flex items-center gap-0.5 rounded p-1 bg-soft overflow-x-auto transition-shadow ${scrolled ? 'shadow-float' : ''}`}>
+            {nav.map(n => (
+              <a key={n.key} href={n.href} aria-current={active === n.key ? 'page' : undefined}
+                 className={`relative flex items-center gap-1.5 h-9 px-3 rounded-[8px] text-sm whitespace-nowrap transition-colors ${active === n.key ? 'bg-card text-ink font-medium shadow-[0_1px_2px_oklch(0.289_0_0/.06)]' : 'text-ink hover:bg-line'}`}>
+                {n.label}
+                {n.count > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-ink text-bg text-[11px] font-medium grid place-items-center pop">{n.count}</span>}
+              </a>
+            ))}
+            <a href="#/" className="btn-dark !h-9 !min-h-0 ml-1 hidden sm:inline-flex">Check a vendor <ArrowDownRight size={15} aria-hidden="true" /></a>
+          </nav>
         </div>
-        <nav aria-label="Main" className="p-3 flex md:flex-col gap-1 overflow-x-auto">
-          {nav.map(n => (
-            <a key={n.key} href={n.href} aria-current={active === n.key ? 'page' : undefined}
-               className={`flex items-center gap-2.5 min-h-[44px] px-3 rounded text-[15px] whitespace-nowrap transition ${active === n.key ? 'bg-accent-soft text-accent-ink font-semibold' : 'text-ink hover:bg-paper'}`}>
-              <n.Icon size={18} aria-hidden="true" />
-              <span className="flex-1">{n.label}</span>
-              {n.count > 0 && <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-warn text-white text-xs font-semibold grid place-items-center">{n.count}</span>}
-            </a>
-          ))}
-        </nav>
-        <p className="hidden md:block absolute bottom-0 p-5 text-xs text-muted leading-relaxed">
-          Vendor and carrier clearance for a 3PL. Every fact links to its record.
-        </p>
-      </aside>
-      <main id="main" className="flex-1 md:ml-60">
-        <div className="max-w-6xl mx-auto px-5 md:px-10 py-8 md:py-10">{page}</div>
-      </main>
+      </header>
+
+      <main id="main" className="flex-1 pt-28 md:pt-32">{page}</main>
+
+      <footer className="mt-28 border-t border-line">
+        <div className="wrap py-10 grid md:grid-cols-12 gap-8 items-end">
+          <div className="md:col-span-4">
+            <div className="flex items-center gap-2 mb-3"><Mark size={22} /><span className="font-medium">Vetted</span></div>
+            <p className="lead">Vendor and carrier clearance for a 3PL. Every fact links to the record it came from.</p>
+          </div>
+          <div className="md:col-span-5 text-sm text-muted space-y-1">
+            <p>Company data: Crustdata API · MCA company records · Razorpay IFSC directory</p>
+            <p>ContextCon 05 · BITS Pilani · Trust and compliance</p>
+          </div>
+          <div className="md:col-span-3 flex md:justify-end"><Ship className="w-40 text-ink" /></div>
+        </div>
+      </footer>
     </div>
   )
 }

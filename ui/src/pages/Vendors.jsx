@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { ArrowDownRight } from 'lucide-react'
 import { api } from '../api'
-import { PageHeader, when } from '../ui'
+import { Section, when } from '../ui'
 
 export default function Vendors() {
   const [rows, setRows] = useState([])
@@ -18,38 +18,41 @@ export default function Vendors() {
   }
 
   return (
-    <>
-      <PageHeader eyebrow="Client records" title="Vendor master">
-        The vendors the client already pays. Every new check is compared against this list for duplicates and shared bank accounts.
-      </PageHeader>
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <label className="btn-secondary cursor-pointer">
-          <Upload size={16} aria-hidden="true" />Import a CSV
-          <input type="file" accept=".csv" className="sr-only" onChange={onFile} />
-        </label>
-        <span className="text-sm text-muted">Columns: vendor_id, legal_name, gstin, pan, cin, domain, bank_account, ifsc, city</span>
-        {msg && <span role="status" className="text-sm">{msg}</span>}
+    <Section enter titleAs="h1" lead="Client records," leadRest="the vendors the client already pays."
+             title="Vendor master"
+             body="Every new check is compared against this list for duplicates and shared bank accounts. Approved vendors are added here once.">
+      <div className="md:grid md:grid-cols-12 gap-x-8 mt-8">
+        <div className="md:col-start-5 md:col-span-8 flex flex-wrap items-center gap-3 enter enter-4">
+          <label className="btn-dark cursor-pointer">
+            Import a CSV <ArrowDownRight size={16} aria-hidden="true" />
+            <input type="file" accept=".csv" className="sr-only" onChange={onFile} />
+          </label>
+          <span className="text-sm text-muted">vendor_id, legal_name, gstin, pan, cin, domain, bank_account, ifsc, city</span>
+          {msg && <span role="status" className="text-sm">{msg}</span>}
+        </div>
       </div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-[15px]">
-          <thead className="text-left text-sm text-muted border-b border-line">
-            <tr>{['Vendor', 'CIN', 'GSTIN', 'Website', 'City', 'Added'].map(h => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.vendor_id} className="border-b border-line last:border-0">
-                <td className="px-5 py-3 font-medium">{r.legal_name}</td>
-                <td className="px-5 py-3 mono">{r.cin || '—'}</td>
-                <td className="px-5 py-3 mono">{r.gstin || '—'}</td>
-                <td className="px-5 py-3">{r.domain || '—'}</td>
-                <td className="px-5 py-3">{r.city || '—'}</td>
-                <td className="px-5 py-3 text-muted">{when(r.added_at)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No vendors yet. Import the client's list or approve a cleared check.</td></tr>}
-          </tbody>
-        </table>
+      <div className="panel p-2 md:p-3 mt-10 enter enter-5">
+        <div className="frame overflow-x-auto" data-lenis-prevent>
+          <table className="w-full text-[15px]">
+            <thead className="text-left text-sm text-muted border-b border-line">
+              <tr>{['Vendor', 'CIN', 'GSTIN', 'Website', 'City', 'Added'].map(h => <th key={h} className="px-5 py-3.5 font-medium">{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.vendor_id} className="border-b border-line last:border-0 hover:bg-bg transition-colors">
+                  <td className="px-5 py-3.5 font-medium">{r.legal_name}</td>
+                  <td className="px-5 py-3.5 mono">{r.cin || '—'}</td>
+                  <td className="px-5 py-3.5 mono">{r.gstin || '—'}</td>
+                  <td className="px-5 py-3.5">{r.domain || '—'}</td>
+                  <td className="px-5 py-3.5">{r.city || '—'}</td>
+                  <td className="px-5 py-3.5 text-muted text-sm">{when(r.added_at)}</td>
+                </tr>
+              ))}
+              {rows.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-muted">No vendors yet. Import the client's list or approve a cleared check.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </>
+    </Section>
   )
 }

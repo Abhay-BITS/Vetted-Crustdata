@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Circle, Loader2, ExternalLink, Receipt } from 'lucide-react'
+import { Check, Loader2, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { api } from '../api'
 import ActionCard, { useApprover } from '../ActionCard'
-import { DecisionBadge, DECISIONS, PageHeader, inr } from '../ui'
+import { DecisionBadge, DECISIONS, inr } from '../ui'
 
 const STEP_LABEL = {
   intake: 'Read the request', duplicates: 'Check the vendor master', resolve: 'Find the company',
-  profile: 'Company profile', registry: 'Registry record', website: 'Website check',
+  profile: 'Company profile', registry: 'Registry record', website: 'Website check', ids: 'Tax ID and bank',
   directors: 'Who runs it', adverse: 'News screen', facts: 'Source check', decide: 'Decision',
 }
 const FIELD_LABEL = {
   legal_name: 'Legal name', cin: 'CIN', status: 'Company status', incorporation_date: 'Incorporated',
   registered_address: 'Registered address', website: 'Website on record', director: 'Director',
   company_profile_name: 'Profile name', headcount: 'Employees', year_founded: 'Founded', open_jobs: 'Open jobs',
-  recent_news: 'Recent news', current_role: 'Current role', website_live: 'Website live',
+  recent_news: 'Recent news', current_role: 'Current role', website_live: 'Website live', bank_branch: 'Bank branch',
   adverse_media: 'Adverse news', namesake_cleared: 'Namesake cleared',
 }
 
@@ -25,106 +25,103 @@ export default function RunView({ runId }) {
   const [err, setErr] = useState('')
 
   const load = () => api.run(runId).then(setRun).catch(e => setErr(e.message))
-  useEffect(() => {
-    load()
-    const t = setInterval(() => { load() }, 1200)
-    return () => clearInterval(t)
-  }, [runId])
+  useEffect(() => { load(); const t = setInterval(load, 1200); return () => clearInterval(t) }, [runId])
   useEffect(() => { if (showLedger) api.ledger(runId).then(setLedger) }, [showLedger, run?.status])
 
-  if (err) return <p role="alert" className="text-bad">{err}</p>
-  if (!run) return <p className="text-muted flex items-center gap-2"><Loader2 className="animate-spin" size={16} />Loading</p>
+  if (err) return <p role="alert" className="wrap text-bad">{err}</p>
+  if (!run) return <p className="wrap text-muted flex items-center gap-2"><Loader2 className="animate-spin" size={16} />Loading</p>
 
   const r = run.result
   const req = run.request || {}
   const cost = run.cost_live || {}
   const running = run.status === 'running'
+  const doneCount = run.steps.filter(s => s.status === 'done').length
 
   return (
-    <>
-      <PageHeader eyebrow={`Check ${run.run_id}`} title={req.vendor_name || req.website || 'Vendor check'} />
+    <div className="wrap">
+      <div className="grid md:grid-cols-12 gap-x-8 gap-y-10">
+        <aside className="md:col-span-4 md:sticky md:top-28 self-start space-y-8 enter">
+          <div>
+            <p className="lead"><b>Vendor check,</b> {running ? 'gathering the facts now.' : 'finished. Every step was saved as it ran.'}</p>
+            <p className="mono text-muted mt-2">{run.run_id}</p>
+          </div>
 
-      <div className="grid lg:grid-cols-[1fr_300px] gap-6 items-start">
-        <div className="space-y-6 min-w-0">
-          {r ? <Report r={r} /> : (
-            <section className="card p-6" aria-live="polite">
-              <h2 className="font-semibold mb-1">Gathering the facts</h2>
-              <p className="text-muted text-sm">Each step is saved as it finishes, so a restart picks up where it stopped.</p>
-            </section>
-          )}
-
-          {run.actions?.length > 0 && (
-            <section aria-labelledby="actions-h">
-              <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-                <h2 id="actions-h" className="text-xl font-semibold">Actions waiting for a person</h2>
-                <label className="text-sm flex items-center gap-2">
-                  <span className="text-muted">Approver</span>
-                  <input className="field !min-h-[40px] w-48" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name" aria-label="Approver name" />
-                </label>
-              </div>
-              <div className="space-y-4">
-                {run.actions.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} />)}
-              </div>
-            </section>
-          )}
-        </div>
-
-        <aside className="space-y-6 lg:sticky lg:top-8">
-          <section className="card p-5" aria-label="Progress">
-            <h2 className="font-semibold mb-4">Steps</h2>
-            <ol className="space-y-2.5">
+          <div>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-sm font-medium">Steps</h2>
+              <span className="mono text-muted">{doneCount}/{run.steps.length}</span>
+            </div>
+            <div className="h-1 rounded-full bg-soft overflow-hidden mb-4"><div className="h-full bg-ink transition-all duration-500" style={{ width: `${(doneCount / run.steps.length) * 100}%` }} /></div>
+            <ol className="space-y-2">
               {run.steps.map(s => (
-                <li key={s.step} className="flex items-center gap-2.5 text-[15px]">
-                  {s.status === 'done' ? <CheckCircle2 size={18} className="text-ok shrink-0" aria-hidden="true" />
-                    : s.status === 'running' ? <Loader2 size={18} className="text-accent animate-spin shrink-0" aria-hidden="true" />
-                    : <Circle size={18} className="text-line shrink-0" aria-hidden="true" />}
-                  <span className={`flex-1 ${s.status === 'pending' ? 'text-muted' : ''}`}>{STEP_LABEL[s.step] || s.step}</span>
+                <li key={s.step} className="flex items-center gap-2.5 text-sm">
+                  <span className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${s.status === 'done' ? 'bg-ink text-bg' : 'bg-soft'}`}>
+                    {s.status === 'done' ? <Check size={12} strokeWidth={3} aria-hidden="true" /> : s.status === 'running' ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : null}
+                  </span>
+                  <span className={`flex-1 ${s.status === 'pending' ? 'text-muted' : ''} ${s.status === 'running' ? 'shimmer font-medium' : ''}`}>{STEP_LABEL[s.step] || s.step}</span>
                   {s.seconds !== null && <span className="mono text-muted">{s.seconds}s</span>}
                 </li>
               ))}
             </ol>
-          </section>
+          </div>
 
-          <section className="card p-5" aria-label="Cost of this check">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Cost of this check</h2>
-              {running && <Loader2 size={16} className="animate-spin text-muted" aria-hidden="true" />}
-            </div>
-            <p className="text-[32px] font-semibold leading-none">{inr(cost.inr)}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
+          <div className="panel p-5">
+            <h2 className="text-sm font-medium">Cost of this check</h2>
+            <p className="text-[40px] leading-none font-medium tracking-tight mt-4">{inr(cost.inr)}</p>
+            <dl className="mt-4 grid grid-cols-2 gap-y-1.5 text-sm">
               <dt className="text-muted">Crustdata credits</dt><dd className="text-right mono">{cost.credits ?? 0}</dd>
               <dt className="text-muted">LLM tokens</dt><dd className="text-right mono">{cost.tokens ?? 0}</dd>
-              <dt className="text-muted">Calls (cached)</dt><dd className="text-right mono">{cost.calls ?? 0} ({cost.cached_calls ?? 0})</dd>
+              <dt className="text-muted">Calls, cached</dt><dd className="text-right mono">{cost.calls ?? 0}, {cost.cached_calls ?? 0}</dd>
               {r?.cost?.price_inr != null && <><dt className="text-muted">Price to client</dt><dd className="text-right mono">{inr(r.cost.price_inr)}</dd></>}
               {r?.seconds != null && <><dt className="text-muted">Time</dt><dd className="text-right mono">{r.seconds}s</dd></>}
             </dl>
-            <button className="btn-secondary w-full mt-4" onClick={() => setShowLedger(v => !v)}>
-              <Receipt size={16} aria-hidden="true" />{showLedger ? 'Hide the call ledger' : 'Show the call ledger'}
+            <button className="btn-ghost w-full mt-3 !justify-between" onClick={() => setShowLedger(v => !v)}>
+              {showLedger ? 'Hide the call ledger' : 'Show the call ledger'} <ArrowDownRight size={16} aria-hidden="true" />
             </button>
-          </section>
+          </div>
         </aside>
-      </div>
 
-      {showLedger && ledger && (
-        <section className="card mt-6 overflow-x-auto" aria-label="Call ledger">
-          <table className="w-full text-sm">
-            <thead className="text-left text-muted border-b border-line">
-              <tr>{['Step', 'Provider', 'Endpoint', 'Result', 'Credits', '₹', 'ms'].map(h => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {ledger.calls.map(c => (
-                <tr key={c.id} className="border-b border-line last:border-0">
-                  <td className="px-4 py-2.5">{c.step}</td><td className="px-4 py-2.5">{c.provider}</td>
-                  <td className="px-4 py-2.5 mono max-w-[320px] truncate" title={c.endpoint}>{c.endpoint}</td>
-                  <td className="px-4 py-2.5">{c.outcome}</td><td className="px-4 py-2.5 mono">{c.credits}</td>
-                  <td className="px-4 py-2.5 mono">{c.inr}</td><td className="px-4 py-2.5 mono">{c.duration_ms ?? ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-    </>
+        <div className="md:col-span-8 min-w-0">
+          <h1 className="h-hero enter enter-1">{req.vendor_name || req.website || 'Vendor check'}</h1>
+          {r ? <Report r={r} /> : (
+            <p className="body-lg mt-3 enter enter-2" aria-live="polite"><span className="shimmer">Checking the registry, staff, hiring and news.</span> Each step is saved, so a restart picks up where it stopped.</p>
+          )}
+
+          {showLedger && ledger && (
+            <section className="frame mt-10 overflow-x-auto pop" aria-label="Call ledger" data-lenis-prevent>
+              <table className="w-full text-sm">
+                <thead className="text-left text-muted border-b border-line">
+                  <tr>{['Step', 'Provider', 'Endpoint', 'Result', 'Credits', '₹', 'ms'].map(h => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {ledger.calls.map(c => (
+                    <tr key={c.id} className="border-b border-line last:border-0">
+                      <td className="px-4 py-2.5">{c.step}</td><td className="px-4 py-2.5">{c.provider}</td>
+                      <td className="px-4 py-2.5 mono max-w-[260px] truncate" title={c.endpoint}>{c.endpoint}</td>
+                      <td className="px-4 py-2.5">{c.outcome}</td><td className="px-4 py-2.5 mono">{c.credits}</td>
+                      <td className="px-4 py-2.5 mono">{c.inr}</td><td className="px-4 py-2.5 mono">{c.duration_ms ?? ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
+          {run.actions?.length > 0 && (
+            <section className="mt-14" aria-labelledby="actions-h">
+              <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+                <h2 id="actions-h" className="h-sec !text-[28px]">Waiting for a person</h2>
+                <label className="text-sm flex items-center gap-2">
+                  <span className="text-muted">Approver</span>
+                  <input className="field !h-10 w-48" value={approver} onChange={e => setApprover(e.target.value)} placeholder="Your name" aria-label="Approver name" />
+                </label>
+              </div>
+              <div className="space-y-3">{run.actions.map(a => <ActionCard key={a.action_id} action={a} approver={approver} onChange={load} />)}</div>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -138,66 +135,66 @@ function Report({ r }) {
     ['Anything off?', (a.anything_off || []).join('\n')],
   ]
   return (
-    <>
-      <section className="card p-6">
-        <div className="flex flex-wrap items-center gap-3 mb-2">
-          <DecisionBadge decision={r.decision} size="lg" />
-          {r.legal_name && <span className="text-muted">{r.legal_name}{r.registry_status ? ` · ${r.registry_status}` : ''}</span>}
-        </div>
-        <p className="text-muted">{d.line}</p>
-        <dl className="mt-6 divide-y divide-line border-y border-line">
-          {rows.map(([q, ans]) => (
-            <div key={q} className="py-4 grid sm:grid-cols-[220px_1fr] gap-2">
-              <dt className="font-medium">{q}</dt>
-              <dd className="whitespace-pre-line">{ans || '—'}</dd>
-            </div>
-          ))}
-        </dl>
-        {(r.reasons?.length > 0 || r.missing?.length > 0 || r.notes?.length > 0) && (
-          <div className="mt-6 grid md:grid-cols-2 gap-6 text-[15px]">
-            {r.reasons?.length > 0 && <List title="Why" items={r.reasons} />}
-            {r.missing?.length > 0 && <List title="Cannot verify: what is missing" items={r.missing} tone="text-unk" />}
-            {r.notes?.length > 0 && <List title="Notes" items={r.notes} />}
-          </div>
-        )}
-      </section>
+    <div className="pop">
+      <div className="flex flex-wrap items-center gap-3 mt-5">
+        <DecisionBadge decision={r.decision} size="lg" />
+        {r.legal_name && <span className="text-sm text-muted">{r.legal_name}{r.registry_status ? ` · ${r.registry_status}` : ''}</span>}
+      </div>
+      <p className="body-lg mt-3">{d.line}</p>
 
-      <section className="card overflow-hidden" aria-labelledby="facts-h">
-        <div className="px-6 pt-6 pb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="facts-h" className="text-xl font-semibold">Facts and their sources</h2>
-          <span className="text-sm text-muted">{r.facts?.length || 0} facts passed the source check{r.rejected_facts?.length ? `, ${r.rejected_facts.length} dropped` : ''}</span>
+      <dl className="mt-8 border-t border-line">
+        {rows.map(([q, ans]) => (
+          <div key={q} className="py-4 grid sm:grid-cols-[210px_1fr] gap-2 border-b border-line">
+            <dt className="text-sm font-medium pt-0.5">{q}</dt>
+            <dd className="whitespace-pre-line text-[15px] leading-relaxed">{ans || '—'}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {(r.reasons?.length > 0 || r.missing?.length > 0 || r.notes?.length > 0) && (
+        <div className="mt-8 grid md:grid-cols-2 gap-x-8 gap-y-6">
+          {r.reasons?.length > 0 && <List title="Why" items={r.reasons} />}
+          {r.missing?.length > 0 && <List title="Cannot verify: what is missing" items={r.missing} />}
+          {r.notes?.length > 0 && <List title="Notes" items={r.notes} />}
         </div>
-        <ul className="divide-y divide-line border-t border-line">
+      )}
+
+      <section className="panel mt-12 p-2 md:p-3" aria-labelledby="facts-h">
+        <div className="px-4 pt-4 pb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="facts-h" className="text-xl">Facts and their sources</h2>
+          <span className="text-sm text-muted">{r.facts?.length || 0} passed the source check{r.rejected_facts?.length ? `, ${r.rejected_facts.length} dropped` : ''}</span>
+        </div>
+        <ul className="frame divide-y divide-line">
           {(r.facts || []).map((f, i) => (
-            <li key={i} className="px-6 py-4 grid md:grid-cols-[180px_1fr] gap-x-6 gap-y-2">
+            <li key={i} className="px-5 py-4 grid md:grid-cols-[170px_1fr] gap-x-6 gap-y-2">
               <div>
                 <p className="eyebrow">{FIELD_LABEL[f.field] || f.field}</p>
                 <p className="font-medium mt-1 break-words">{String(f.value)}</p>
               </div>
               <div className="min-w-0">
-                <blockquote className="mono text-ink/80 bg-paper border-l-2 border-accent/40 px-3 py-2 rounded-r break-words">{f.passage}</blockquote>
-                <p className="mt-2 text-sm text-muted flex flex-wrap gap-x-3 gap-y-1">
-                  <a href={f.url} target="_blank" rel="noreferrer" className="link inline-flex items-center gap-1">{f.source}<ExternalLink size={13} aria-hidden="true" /></a>
+                <blockquote className="mono text-[oklch(0.37_0_0)] bg-bg rounded px-3 py-2 break-words">{f.passage}</blockquote>
+                <p className="mt-2 text-[13px] text-muted flex flex-wrap gap-x-3 gap-y-1">
+                  <a href={f.url} target="_blank" rel="noreferrer" className="textlink !font-medium !text-ink">{f.source}<ArrowUpRight size={13} aria-hidden="true" /></a>
                   {f.locator && <span>{f.locator}</span>}
                   {f.record_date && <span>record dated {f.record_date}</span>}
                   <span>retrieved {f.retrieved_at}</span>
                 </p>
-                {f.note && <p className="mt-1 text-sm text-muted">{f.note}</p>}
+                {f.note && <p className="mt-1 text-[13px] text-muted">{f.note}</p>}
               </div>
             </li>
           ))}
-          {!r.facts?.length && <li className="px-6 py-6 text-muted">No fact could be tied to a record.</li>}
+          {!r.facts?.length && <li className="px-5 py-6 text-muted">No fact could be tied to a record.</li>}
         </ul>
       </section>
-    </>
+    </div>
   )
 }
 
-function List({ title, items, tone = '' }) {
+function List({ title, items }) {
   return (
     <div>
-      <h3 className="font-semibold mb-2">{title}</h3>
-      <ul className={`space-y-1.5 list-disc pl-5 ${tone}`}>{items.map((x, i) => <li key={i}>{x}</li>)}</ul>
+      <h3 className="text-sm font-medium mb-2">{title}</h3>
+      <ul className="space-y-1.5 text-[15px] text-muted">{items.map((x, i) => <li key={i} className="pl-4 relative before:content-[''] before:absolute before:left-0 before:top-[0.6em] before:w-1.5 before:h-1.5 before:rounded-full before:bg-line">{x}</li>)}</ul>
     </div>
   )
 }

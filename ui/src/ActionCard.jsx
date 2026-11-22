@@ -24,11 +24,11 @@ export default function ActionCard({ action, approver, onChange, context }) {
   }
 
   return (
-    <article className="card p-5">
+    <article className="frame p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="eyebrow mb-1">It plans to</p>
-          <h3 className="font-semibold text-[17px]">{ACTION_LABEL[action.kind] || action.kind}</h3>
+          <p className="eyebrow mb-1.5">It plans to</p>
+          <h3 className="text-lg">{ACTION_LABEL[action.kind] || action.kind}</h3>
         </div>
         <StatusPill status={action.status} />
       </div>
@@ -36,19 +36,19 @@ export default function ActionCard({ action, approver, onChange, context }) {
       {context}
 
       {action.kind === 'email_vendor' && (
-        <div className="mt-4 rounded border border-line bg-paper">
-          <div className="px-4 py-2.5 border-b border-line text-sm">
-            <span className="text-muted">To</span> <span className="mono">{p.to}</span>
-            <span className="block"><span className="text-muted">Subject</span> {p.subject}</span>
+        <div className="mt-4 rounded bg-bg">
+          <div className="px-4 py-3 border-b border-line text-sm space-y-0.5">
+            <p><span className="text-muted">To</span> <span className="mono">{p.to}</span></p>
+            <p><span className="text-muted">Subject</span> {p.subject}</p>
           </div>
-          <pre className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap font-sans max-h-56 overflow-auto">{p.body}</pre>
+          <pre className="px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap font-sans text-[oklch(0.37_0_0)] max-h-56 overflow-auto" data-lenis-prevent>{p.body}</pre>
         </div>
       )}
       {action.kind === 'activate_vendor' && (
-        <dl className="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
+        <dl className="mt-4 grid sm:grid-cols-3 gap-2 text-sm">
           {[['Legal name', p.legal_name], ['CIN', p.cin], ['Website', p.domain]].map(([k, v]) => (
-            <div key={k} className="rounded border border-line bg-paper px-3 py-2">
-              <dt className="text-muted text-xs">{k}</dt><dd className="mono break-all">{v || '—'}</dd>
+            <div key={k} className="rounded bg-bg px-3.5 py-2.5">
+              <dt className="text-muted text-xs">{k}</dt><dd className="mono break-all mt-0.5">{v || '—'}</dd>
             </div>
           ))}
         </dl>
@@ -56,22 +56,14 @@ export default function ActionCard({ action, approver, onChange, context }) {
 
       {open ? (
         <div className="mt-5 flex flex-wrap gap-2">
-          <button className="btn-primary" onClick={() => decide('approve')} disabled={!!busy}>
-            <Check size={18} aria-hidden="true" />{busy === 'approve' ? 'Approving…' : 'Approve'}
-          </button>
-          {action.status !== 'held' && (
-            <button className="btn-secondary" onClick={() => decide('hold')} disabled={!!busy}>
-              <Pause size={18} aria-hidden="true" />Hold
-            </button>
-          )}
-          <button className="btn-danger" onClick={() => decide('block')} disabled={!!busy}>
-            <Ban size={18} aria-hidden="true" />Block
-          </button>
+          <button className="btn-dark" onClick={() => decide('approve')} disabled={!!busy}><Check size={16} aria-hidden="true" />{busy === 'approve' ? 'Approving' : 'Approve'}</button>
+          {action.status !== 'held' && <button className="btn-soft" onClick={() => decide('hold')} disabled={!!busy}><Pause size={16} aria-hidden="true" />Hold</button>}
+          <button className="btn-bad" onClick={() => decide('block')} disabled={!!busy}><Ban size={16} aria-hidden="true" />Block</button>
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted">
           {action.approver ? <>Decided by <span className="font-medium text-ink">{action.approver}</span> · {when(action.updated_at)}</> : null}
-          {action.status === 'done' && <> · executed <span className="font-medium text-ink">{action.executed_count}×</span></>}
+          {action.status === 'done' && <> · executed <span className="font-medium text-ink">{action.executed_count} time{action.executed_count === 1 ? '' : 's'}</span></>}
         </p>
       )}
       {err && <p role="alert" className="mt-3 text-sm text-bad">{err}</p>}

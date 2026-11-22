@@ -181,4 +181,4 @@ plan. No code was written before the build.
 
 FastAPI (MIT), Uvicorn (BSD-3), httpx (BSD-3), Pydantic (MIT), PyYAML (MIT), python-dotenv (BSD-3), Beautiful Soup (MIT),
 RapidFuzz (MIT), python-multipart (Apache-2.0), React (MIT), Vite (MIT), Tailwind CSS (MIT), PostCSS (MIT),
-Autoprefixer (MIT), lucide-react (ISC), IBM Plex fonts (SIL OFL 1.1).
+Autoprefixer (MIT), lucide-react (ISC), Lenis smooth scroll (MIT), Switzer font by Indian Type Foundry via Fontshare (ITF Free Font License), Geist Mono font (SIL OFL 1.1).
