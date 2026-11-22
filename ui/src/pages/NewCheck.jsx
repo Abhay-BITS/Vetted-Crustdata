@@ -22,18 +22,19 @@ const SAMPLES = [
   { label: 'Small transporter', data: { vendor_name: 'Sharma Roadlines', entity_type: 'proprietorship', city: 'Jaipur' } },
 ]
 
-export default function NewCheck() {
+export default function NewCheck({ user = null }) {
   const [stats, setStats] = useState(null)
   const [sample, setSample] = useState(null)
   const ref = useReveal([sample, stats])
 
   useEffect(() => {
+    if (!user) return
     api.summary().then(setStats).catch(() => {})
     api.runs().then(async runs => {
       const cleared = runs.find(r => r.decision === 'CLEARED')
       if (cleared) setSample((await api.run(cleared.run_id)).result)
     }).catch(() => {})
-  }, [])
+  }, [user])
 
   return (
     <div ref={ref}>
@@ -54,8 +55,13 @@ export default function NewCheck() {
               <h1 className="h-hero enter enter-2">Vendor and carrier clearance, with a source for every fact</h1>
               <p className="mt-[clamp(10px,1.6vh,16px)] body-lg enter enter-3">Send us a new vendor's name and website. We check the company registry, staff, hiring and news, screen the directors and clear namesakes, then hand your team the decision and the evidence to approve.</p>
               <div className="mt-[clamp(18px,3vh,32px)] flex flex-wrap gap-2 enter enter-4">
-                <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
-                <a className="btn-soft btn-lg" href="#/approvals">Review your approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
+                {user ? <>
+                  <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
+                  <a className="btn-soft btn-lg" href="#/approvals">Review your approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
+                </> : <>
+                  <a className="btn-dark btn-lg" href="#/login">Log in to your desk <ArrowDownRight size={18} aria-hidden="true" /></a>
+                  <button className="btn-soft btn-lg" onClick={() => scrollToId('pricing')}>See plans <ArrowDownRight size={18} aria-hidden="true" /></button>
+                </>}
               </div>
             </div>
             <div className="hidden min-[1360px]:flex min-[1360px]:col-span-3 justify-end items-start pt-1" aria-hidden="true">
@@ -71,12 +77,18 @@ export default function NewCheck() {
                title="Check a new vendor"
                body="The check usually takes about a minute. Nothing is sent to the vendor and nothing is added to your vendor master until your team approves it.">
         <div className="panel mt-10 p-3 md:p-12 reveal">
-          <div className="frame max-w-3xl mx-auto"><CheckForm /></div>
+          <div className="frame max-w-3xl mx-auto">{user ? <CheckForm /> : (
+            <div className="p-8 text-center">
+              <p className="text-lg font-medium">Log in to check a vendor</p>
+              <p className="text-sm text-muted mt-1">Your company's workspace keeps your checks, approvals and vendor master private.</p>
+              <a className="btn-dark mt-5 inline-flex" href="#/login">Log in <ArrowDownRight size={16} aria-hidden="true" /></a>
+            </div>
+          )}</div>
         </div>
       </Section>
 
       {/* the client's desk at a glance */}
-      {stats && <YourDesk stats={stats} />}
+      {user && stats && <YourDesk stats={stats} />}
 
       {/* plans */}
       <Section id="pricing" className="mt-24 md:mt-32" lead="Plans," leadRest="pay per vendor, or a monthly plan with re-screening."

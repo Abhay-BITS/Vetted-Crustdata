@@ -1,5 +1,6 @@
 async function req(path, opts = {}) {
   const r = await fetch(path, { headers: { 'content-type': 'application/json' }, ...opts })
+  if (r.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event('vetted:logged-out'))
   if (!r.ok) {
     let msg = r.statusText
     try { msg = (await r.json()).detail || msg } catch {}
@@ -25,6 +26,9 @@ export const api = {
     return r.json()
   },
   summary: () => req('/api/summary'),
+  me: () => req('/api/auth/me'),
+  login: (email, password) => req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => req('/api/auth/logout', { method: 'POST' }),
   batch: (id) => req(`/api/batches/${id}`),
   plans: () => req('/api/plans'),
   billing: () => req('/api/billing'),

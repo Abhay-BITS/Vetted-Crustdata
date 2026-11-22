@@ -27,12 +27,21 @@ PORT = 8765
 BASE = f"http://127.0.0.1:{PORT}"
 
 
+_cookies = {}
+
+
+def _login():
+    r = httpx.post(BASE + "/api/auth/login", json={"email": "demo@vetted.example", "password": os.environ.get("DEMO_PASSWORD", "vetted-demo")})
+    _cookies.clear(); _cookies.update(dict(r.cookies))
+
+
 def start():
     p = subprocess.Popen([str(ROOT / ".venv/bin/uvicorn"), "vetted.api:app", "--port", str(PORT)],
                          cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(60):
         try:
             httpx.get(BASE + "/api/summary", timeout=1)
+            _login()
             return p
         except Exception:
             time.sleep(0.3)
@@ -48,16 +57,16 @@ def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "TCI Express Limited"
     site = sys.argv[2] if len(sys.argv) > 2 else "tciexpress.in"
     p = start()
-    rid = httpx.post(BASE + "/api/runs", json={"vendor_name": name, "website": site}).json()["run_id"]
+    rid = httpx.post(BASE + "/api/runs", cookies=_cookies, json={"vendor_name": name, "website": site}).json()["run_id"]
     print("run", rid)
     time.sleep(float(os.environ.get("KILL_AFTER", "6")))
-    steps_before = [s["step"] for s in httpx.get(f"{BASE}/api/runs/{rid}").json()["steps"] if s["status"] == "done"]
+    steps_before = [s["step"] for s in httpx.get(f"{BASE}/api/runs/{rid}", cookies=_cookies).json()["steps"] if s["status"] == "done"]
     kill(p)
     print("KILLED after steps:", steps_before)
 
     p = start()
     for _ in range(200):
-        r = httpx.get(f"{BASE}/api/runs/{rid}").json()
+        r = httpx.get(f"{BASE}/api/runs/{rid}", cookies=_cookies).json()
         if r["status"] != "running":
             break
         time.sleep(1)
@@ -68,11 +77,11 @@ def main():
                          GROUP BY request_hash HAVING COUNT(*)>1""", (rid,)).fetchall()
     print("paid calls repeated after restart:", len(paid))
 
-    acts = httpx.get(f"{BASE}/api/runs/{rid}").json()["actions"]
+    acts = httpx.get(f"{BASE}/api/runs/{rid}", cookies=_cookies).json()["actions"]
     from vetted.api import _approvers
     name, pin = next(iter(_approvers().items()), ("kill-test", ""))
     for a in acts:
-        httpx.post(f"{BASE}/api/actions/{a['action_id']}/approve", json={"approver": name, "pin": pin, "reason": "kill test"})
+        httpx.post(f"{BASE}/api/actions/{a['action_id']}/approve", cookies=_cookies, json={"approver": name, "pin": pin, "reason": "kill test"})
     time.sleep(4)
 
     # simulate a crash after the effect happened but before the status was recorded
@@ -82,7 +91,7 @@ def main():
     kill(p)
     p = start()
     time.sleep(4)
-    final = httpx.get(f"{BASE}/api/runs/{rid}").json()["actions"]
+    final = httpx.get(f"{BASE}/api/runs/{rid}", cookies=_cookies).json()["actions"]
     ok = True
     for a in final:
         emails = len(list(OUTBOX_DIR.glob(f"{a['action_id']}*.eml")))

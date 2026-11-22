@@ -86,6 +86,14 @@ Every fact carries its **source link, the exact passage or API field, the record
 
 A fact whose value does not appear in its own quoted passage is dropped by the source check and cannot support a decision.
 
+## Log in
+
+The workspace is behind a log-in. Passwords are stored as salted PBKDF2 hashes; sessions are server-side, in an HttpOnly
+cookie, and end after 7 days or on log-out. Every `/api` route needs a session except log-in, plans and the health summary.
+Accounts come from `APP_USERS` (`email|password|Name|role;...`); a public demo account (`demo@vetted.example`, password from
+`DEMO_PASSWORD`, default `vetted-demo`) lets judges try it. Visitors who are not logged in see the public home page with
+pricing.
+
 ## Plans and payments
 
 Plans live in `policy.yaml` (Pay as you go ₹999 per vendor · Growth ₹19,999/month with 30 checks and re-screening of
@@ -101,7 +109,7 @@ Each order is paid exactly once: a repeated confirmation returns "already paid" 
 ## Next: many 3PLs on one service (designed, not built in this event)
 
 - a `companies` table with every run, action, vendor and setting scoped to one company, so no client sees another's data;
-- sign-up and log-in with roles (admin, approver, analyst) replacing approver PINs;
+- self-serve sign-up for new companies, and roles (admin, approver, analyst) replacing approver PINs (log-in itself is built);
 - emails sent in each client's name, per-client policy, approvers and vendor master;
 - usage metered and invoiced per company; API keys so a client's ERP can send vendors;
 - an operator console (all companies, usage, our cost per check and margin) for Vetted staff only;

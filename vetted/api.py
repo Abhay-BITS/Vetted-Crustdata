@@ -15,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +31,49 @@ store = Store()
 app = FastAPI(title="Vetted")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _active: dict[str, threading.Thread] = {}
+
+from . import auth as _auth
+_auth.setup(store)
+
+# every /api route needs a signed-in user, except these
+PUBLIC_API = {"/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/plans", "/api/summary"}
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and path not in PUBLIC_API:
+        if not _auth.user_for(store, request.cookies.get(_auth.COOKIE)):
+            return JSONResponse({"detail": "Please log in."}, status_code=401)
+    return await call_next(request)
+
+
+class LoginReq(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/login")
+def auth_login(req: LoginReq, request: Request, response: Response):
+    res = _auth.login(store, req.email, req.password)
+    if not res:
+        raise HTTPException(401, "That email and password do not match.")
+    token, user = res
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    response.set_cookie(_auth.COOKIE, token, httponly=True, samesite="lax", secure=secure, max_age=_auth.SESSION_DAYS * 86400, path="/")
+    return user
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request, response: Response):
+    _auth.logout(store, request.cookies.get(_auth.COOKIE))
+    response.delete_cookie(_auth.COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    return {"user": _auth.user_for(store, request.cookies.get(_auth.COOKIE))}
 
 
 def _start(run_id: str, request: dict) -> None:
