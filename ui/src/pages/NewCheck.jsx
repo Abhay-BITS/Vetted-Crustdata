@@ -37,13 +37,13 @@ export default function NewCheck() {
   return (
     <div ref={ref}>
       {/* hero: fills the first screen, the quay along its bottom */}
-      <div className="relative min-h-[calc(100svh-7rem)] md:min-h-[calc(100svh-8rem)] flex flex-col">
+      <div className="relative min-h-[calc(100svh-clamp(76px,11.5vh,128px))] flex flex-col">
         {/* hand-drawn extras in the empty space: same style as the quay */}
-        <div className="absolute inset-x-0 top-[62%] bottom-[170px] md:bottom-[210px] enter enter-5"><Sky /></div>
+        <div className="absolute inset-x-0 top-[62%] bottom-[clamp(130px,20vh,210px)] enter enter-5"><Sky /></div>
         {/* One grid for the whole hero: left 3 columns (intro + magnifier), centre 6 (headline, text, buttons),
             right 3 (clipboard). Left edges meet the logo pill, right edges meet the nav pill; the intro, the headline and
             the clipboard share a top line, and the magnifier's bottom meets the buttons' bottom. */}
-        <section className="wrap relative z-10 w-full pt-6 md:pt-10">
+        <section className="wrap relative z-10 w-full pt-[clamp(0px,2vh,40px)]">
           <div className="grid md:grid-cols-12 gap-x-8 gap-y-4">
             <div className="md:col-span-4 min-[1360px]:col-span-3 flex flex-col justify-between">
               <p className="lead pt-3 enter enter-1"><b>For 3PL vendor desks,</b> see who a new carrier really is before the first rupee moves.</p>
@@ -51,8 +51,8 @@ export default function NewCheck() {
             </div>
             <div className="md:col-span-8 min-[1360px]:col-span-6 max-w-[620px]">
               <h1 className="h-hero enter enter-2">Vendor and carrier clearance, with a source for every fact</h1>
-              <p className="mt-4 body-lg enter enter-3">Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.</p>
-              <div className="mt-8 flex flex-wrap gap-2 enter enter-4">
+              <p className="mt-[clamp(10px,1.6vh,16px)] body-lg enter enter-3">Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.</p>
+              <div className="mt-[clamp(18px,3vh,32px)] flex flex-wrap gap-2 enter enter-4">
                 <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
                 <a className="btn-soft btn-lg" href="#/approvals">See the approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
               </div>
@@ -62,7 +62,7 @@ export default function NewCheck() {
             </div>
           </div>
         </section>
-        <Frieze className="w-full mt-auto pt-10 enter enter-5" />
+        <Frieze className="w-full mt-auto pt-[clamp(12px,3vh,40px)] enter enter-5" />
       </div>
 
       {/* the form */}

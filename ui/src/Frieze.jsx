@@ -350,7 +350,7 @@ const SPRITES = [
 
 export default function Frieze({ className = '' }) {
   return (
-    <div className={`vt-frieze relative h-[250px] md:h-[290px] select-none ${className}`} aria-hidden="true">
+    <div className={`vt-frieze relative h-[clamp(170px,26vh,290px)] select-none ${className}`} aria-hidden="true">
       <Defs />
       <Quay />
       <div className="vt-stage">

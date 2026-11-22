@@ -70,7 +70,7 @@ export default function App() {
         </div>
       </header>
 
-      <main id="main" className="flex-1 pt-28 md:pt-32">{page}</main>
+      <main id="main" className="flex-1 pt-[clamp(76px,11.5vh,128px)]">{page}</main>
 
       <footer className="mt-28 border-t border-line">
         <div className="wrap py-10 grid md:grid-cols-12 gap-8 items-end">
