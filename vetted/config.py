@@ -13,7 +13,7 @@ LOG_DIR = ROOT / "logs"
 DATA_DIR.mkdir(exist_ok=True)
 LOG_DIR.mkdir(exist_ok=True)
 
-load_dotenv(ROOT / ".env")
+load_dotenv(ROOT / ".env", override=True)
 
 
 def env(name: str, default: str | None = None) -> str | None:

@@ -398,6 +398,28 @@ def step_website(ctx: RunContext, state: dict) -> dict:
     return {"checked": True, "live": False, "url": urls[0], "retrieved_at": time.time()}
 
 
+# --------------------------------------------------------------------------- step 5b: tax id and bank
+def step_ids(ctx: RunContext, state: dict) -> dict:
+    from .idchecks import check_gstin, lookup_ifsc
+    v, reg = state["intake"], state.get("registry") or {}
+    insta = ((reg.get("pages") or {}).get("instafinancials") or {}).get("fields") or {}
+    legal = (insta.get("legal_name") or {}).get("value") or v.get("vendor_name")
+    addr = (insta.get("registered_address") or {}).get("value")
+    out: dict = {"flags": [], "notes": []}
+    if v.get("gstin"):
+        g = check_gstin(v["gstin"], v.get("pan"), legal, addr)
+        out["gstin"] = {k: g[k] for k in g if k != "checks"} | {"checks": [list(c) for c in g["checks"]]}
+        out["flags"] += g["flags"]
+    if v.get("ifsc"):
+        b = lookup_ifsc(ctx, v["ifsc"])
+        out["ifsc"] = b
+        out["flags"] += b.get("flags", [])
+        if b.get("outcome") == "ok" and addr and b.get("state") and b["state"].lower() not in addr.lower():
+            out["notes"].append(f"Bank branch is in {b['city']}, {b['state']}; the registered office is elsewhere "
+                                f"(common for multi-city firms, worth a look)")
+    return out
+
+
 # --------------------------------------------------------------------------- step 6: who runs it
 def step_directors(ctx: RunContext, state: dict) -> dict:
     reg = state.get("registry") or {}
@@ -560,6 +582,11 @@ def step_facts(ctx: RunContext, state: dict) -> dict:
                                        locator=f"people.{m['group']} (person id {m.get('person_id')})",
                                        passage=f"name: {m['name']}; current_title: {m.get('title')}; current employers: {', '.join(m.get('current_employers') or [])}",
                                        record_date=(m.get("updated_at") or "")[:10] or None, retrieved_at=ret))
+    b = (state.get("ids") or {}).get("ifsc") or {}
+    if b.get("outcome") == "ok":
+        facts.append(make_fact(subject=b["ifsc"], field="bank_branch", value=b["bank"],
+                               source="Razorpay IFSC directory", url=b["url"], locator="BANK, BRANCH, CITY, STATE fields",
+                               passage=b["passage"], retrieved_at=b.get("retrieved_at")))
     for s in (state.get("adverse") or {}).get("screened", []):
         for hit in s.get("confirmed", []):
             facts.append(make_fact(subject=s["name"], field="adverse_media", value=s["name"],
@@ -631,6 +658,9 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     for c in dirs.get("claimed") or []:
         if c["on_registry"] is False:
             flags.append(f"Claimed director {c['name']} is not on the registry record")
+    id_flags = (state.get("ids") or {}).get("flags") or []
+    flags += id_flags
+    notes += (state.get("ids") or {}).get("notes") or []
     adverse_confirmed = []
     for s in (state.get("adverse") or {}).get("screened", []):
         for hit in s.get("confirmed", []):
@@ -674,7 +704,7 @@ def step_decide(ctx: RunContext, state: dict) -> dict:
     elif status and status.lower() in reject_statuses:
         decision = "REJECTED"
         reasons.append(f"Registry status is '{status}'")
-    elif res.get("lookalike") or dup.get("shared_bank") or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
+    elif res.get("lookalike") or dup.get("shared_bank") or id_flags or (adverse_confirmed and pol["decision"]["refer_on_adverse_media"]):
         decision = "REFER"
         reasons.append("Red flags need a person: " + "; ".join(flags))
     elif not reg.get("cin") and pol["decision"]["cannot_verify_without_registry"]:
@@ -727,6 +757,7 @@ STEPS = [
     ("profile", step_profile),
     ("registry", step_registry),
     ("website", step_website),
+    ("ids", step_ids),
     ("directors", step_directors),
     ("adverse", step_adverse),
     ("facts", step_facts),
