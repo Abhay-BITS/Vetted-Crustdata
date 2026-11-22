@@ -155,7 +155,7 @@ function CheckForm() {
             <Field id="city" label="City" placeholder="Mumbai" value={f.city} onChange={set('city')} />
             <Field id="cin" label="CIN" hint="if known" mono placeholder="L61074MH1991PLC061074" value={f.cin} onChange={set('cin')} />
             <Field id="gstin" label="GSTIN" hint="if known" mono placeholder="27AAACB0446L1ZS" value={f.gstin} onChange={set('gstin')} />
-            <Field id="directors" label="Directors the vendor named" hint="comma separated" span placeholder="Balfour Manuel" value={f.directors} onChange={set('directors')} />
+            <Field id="directors" label="Directors named on the vendor's application" hint="optional, comma separated: checked against the official record" span placeholder="Balfour John Manuel" value={f.directors} onChange={set('directors')} />
             <Field id="contact_email" label="Vendor contact email" hint="a teammate's inbox in the demo" span type="email" placeholder="vendor-desk@example.test" value={f.contact_email} onChange={set('contact_email')} />
           </div>
         ) : (
