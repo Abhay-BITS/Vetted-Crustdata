@@ -35,6 +35,9 @@ export function Defs() {
 }
 
 /* ---------- people ---------- */
+// pivot points in user units (view-box origin is the 0,0 of the drawing, not its corner)
+const HIP = { transformBox: 'view-box', transformOrigin: '0px -42px' }
+const SHOULDER = { transformBox: 'view-box', transformOrigin: '0px -75px' }
 export function Person({ coat = T.slate, trousers = T.denim, hat = 'none', pose = 'stand', flip = false, prop = null, skin = T.sand }) {
   const walk = pose === 'walk'
   const legL = walk ? 'M-4 -42 L-10 -3' : 'M-4 -42 L-5 -2'
@@ -52,21 +55,42 @@ export function Person({ coat = T.slate, trousers = T.denim, hat = 'none', pose 
       <g transform={flip ? 'scale(-1,1)' : undefined} filter="url(#vt-sketch)">
         <ellipse cx="0" cy="0" rx="14" ry="2.6" fill="url(#vt-hatch)" opacity=".7" />
         {/* legs + shoes */}
-        <path d={legL} {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
-        <path d={legR} {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
-        <path d={legL} {...thin} fill="none" opacity=".55" />
-        <path d={legR} {...thin} fill="none" opacity=".55" />
-        <path d={walk ? 'M-14 -2 h7' : 'M-9 -1 h7'} {...st} strokeWidth="3" />
-        <path d={walk ? 'M7 -1 h7' : 'M2 -1 h7'} {...st} strokeWidth="3" />
+        {walk ? (
+          <>
+            <g className="vt-leg" style={HIP}>
+              <path d="M-1 -42 L-1 -3" {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
+              <path d="M-1 -42 L-1 -3" {...thin} fill="none" opacity=".55" />
+              <path d="M-4 -1.5 h8" {...st} strokeWidth="3" />
+            </g>
+            <g className="vt-leg vt-leg-b" style={HIP}>
+              <path d="M1 -42 L1 -3" {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
+              <path d="M1 -42 L1 -3" {...thin} fill="none" opacity=".55" />
+              <path d="M-2 -1.5 h8" {...st} strokeWidth="3" />
+            </g>
+          </>
+        ) : (
+          <>
+            <path d={legL} {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
+            <path d={legR} {...st} fill="none" strokeWidth="5.2" stroke={trousers} />
+            <path d={legL} {...thin} fill="none" opacity=".55" />
+            <path d={legR} {...thin} fill="none" opacity=".55" />
+            <path d="M-9 -1 h7" {...st} strokeWidth="3" />
+            <path d="M2 -1 h7" {...st} strokeWidth="3" />
+          </>
+        )}
         {/* coat */}
         <path d="M-10 -76 Q-13 -60 -12 -40 L12 -40 Q13 -60 10 -76 Q0 -80 -10 -76 Z" fill={coat} {...st} />
         <path d="M-12 -40 L12 -40 L10 -44 L-10 -44 Z" fill="url(#vt-hatch)" />
         <path d="M0 -77 V-42" {...thin} opacity=".45" />
         {/* arms */}
-        <path d={armL} {...st} fill="none" strokeWidth="4.4" stroke={coat} />
-        <path d={armR} {...st} fill="none" strokeWidth="4.4" stroke={coat} />
-        <path d={armL} {...thin} fill="none" opacity=".6" />
-        <path d={armR} {...thin} fill="none" opacity=".6" />
+        <g className={walk && !prop ? 'vt-arm' : undefined} style={SHOULDER}>
+          <path d={armL} {...st} fill="none" strokeWidth="4.4" stroke={coat} />
+          <path d={armL} {...thin} fill="none" opacity=".6" />
+        </g>
+        <g className={walk && !prop ? 'vt-arm vt-arm-b' : undefined} style={SHOULDER}>
+          <path d={armR} {...st} fill="none" strokeWidth="4.4" stroke={coat} />
+          <path d={armR} {...thin} fill="none" opacity=".6" />
+        </g>
         {/* head */}
         <path d="M-2.5 -80 v-4 h5 v4" fill={skin} {...thin} />
         <circle cx="0" cy="-90" r="7" fill={skin} {...st} />
@@ -117,9 +141,14 @@ export function Containers() {
   )
 }
 
-export function Truck() {
+export function Truck({ puff = true }) {
   return (
     <svg viewBox="0 0 170 78" className="w-full h-auto overflow-visible">
+      {puff && (
+        <g aria-hidden="true">
+          {[0, 1, 2].map(i => <circle key={i} className="vt-puff" style={{ animationDelay: `${i * 0.9}s` }} cx="166" cy="56" r="4" fill="oklch(0.9 0.004 84)" stroke={INK} strokeWidth=".8" opacity="0" />)}
+        </g>
+      )}
       <g filter="url(#vt-sketch)">
         <ellipse cx="85" cy="76" rx="82" ry="2.6" fill="url(#vt-hatch)" opacity=".75" />
         <rect x="2" y="10" width="118" height="52" rx="2" fill={T.cream} {...st} />
@@ -129,6 +158,7 @@ export function Truck() {
         <path d="M124 62 V30 q0-6 6-6 h18 l14 18 v20 z" fill={T.rust} {...st} />
         <path d="M132 30 h14 l9 12 h-23 z" fill={T.cream} {...st} />
         <path d="M120 62 h46" {...st} />
+        <path d="M162 60 h6 v-3" fill="none" {...st} />
         {[24, 98, 148].map(cx => (
           <g key={cx}>
             <circle cx={cx} cy="64" r="10" fill={PAPER} {...st} /><circle cx={cx} cy="64" r="3" fill={INK} opacity=".7" />
@@ -146,8 +176,10 @@ export function Forklift() {
       <g filter="url(#vt-sketch)">
         <ellipse cx="45" cy="78" rx="42" ry="2.4" fill="url(#vt-hatch)" opacity=".7" />
         <path d="M8 22 V72 M14 22 V72" {...st} />
-        <path d="M14 66 H-2 M14 60 H-2" {...st} />
-        <rect x="-4" y="40" width="18" height="18" fill={T.sand} {...st} /><path d="M-4 49 h18" {...thin} opacity=".5" />
+        <g className="vt-lift">
+          <path d="M14 66 H-2 M14 60 H-2" {...st} />
+          <rect x="-4" y="40" width="18" height="18" fill={T.sand} {...st} /><path d="M-4 49 h18" {...thin} opacity=".5" />
+        </g>
         <path d="M16 70 V40 h30 l12 -18 h12 V70 Z" fill={T.ochre} {...st} />
         <path d="M46 40 l12 -18" {...thin} />
         <rect x="60" y="48" width="18" height="22" fill="url(#vt-hatch)" />
@@ -216,7 +248,7 @@ export function Gull() {
   return (
     <svg viewBox="0 0 44 18" className="w-full h-auto overflow-visible">
       <g filter="url(#vt-sketch)">
-        <path d="M2 8 Q12 0 21 9 Q30 0 42 6" fill="none" {...st} strokeWidth="1.8" />
+        <path className="vt-wing" style={{ transformBox: 'view-box', transformOrigin: '21px 9px' }} d="M2 8 Q12 0 21 9 Q30 0 42 6" fill="none" {...st} strokeWidth="1.8" />
         <ellipse cx="21" cy="10" rx="5" ry="2.6" fill={PAPER} {...st} />
         <path d="M25 10 l4 1" {...st} stroke={T.ochre} strokeWidth="2" />
       </g>
@@ -229,14 +261,19 @@ export function Quay() {
   return (
     <svg viewBox="0 0 1440 70" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[70px]" aria-hidden="true">
       <g filter="url(#vt-sketch)">
-        <rect x="0" y="4" width="1440" height="30" fill={T.stone} />
+        {/* back edge where things stand */}
         <path d="M0 4 H1440" {...st} />
-        <path d="M0 10 H1440" {...thin} opacity=".4" />
-        {[...Array(48)].map((_, i) => <path key={i} d={`M${i * 30 + (i % 2) * 12} 10 v24`} {...thin} opacity=".35" />)}
-        <path d="M0 22 H1440" {...thin} opacity=".3" />
-        <rect x="0" y="22" width="1440" height="12" fill="url(#vt-hatch)" />
-        <path d="M0 34 H1440" {...st} />
-        {[...Array(30)].map((_, i) => <path key={'w' + i} d={`M${i * 52 + (i % 3) * 9} ${44 + (i % 3) * 8} q8 -3 16 0 t16 0`} fill="none" {...thin} opacity=".35" />)}
+        {/* paved walkway: the front lane people walk along */}
+        <rect x="0" y="4" width="1440" height="16" fill={T.cream} />
+        {[...Array(60)].map((_, i) => <path key={'p' + i} d={`M${i * 24 + (i % 2) * 8} 7 l-3 11`} {...thin} opacity=".22" />)}
+        <path d="M0 20 H1440" {...st} />
+        {/* stone quay wall */}
+        <rect x="0" y="20" width="1440" height="20" fill={T.stone} />
+        {[...Array(48)].map((_, i) => <path key={i} d={`M${i * 30 + (i % 2) * 12} 20 v20`} {...thin} opacity=".35" />)}
+        <path d="M0 30 H1440" {...thin} opacity=".3" />
+        <rect x="0" y="30" width="1440" height="10" fill="url(#vt-hatch)" />
+        <path d="M0 40 H1440" {...st} />
+        {[...Array(30)].map((_, i) => <path key={'w' + i} d={`M${i * 52 + (i % 3) * 9} ${49 + (i % 3) * 7} q8 -3 16 0 t16 0`} fill="none" {...thin} opacity=".35" />)}
       </g>
     </svg>
   )
@@ -276,7 +313,7 @@ export function Scene({ sprites = [], walkers = [], flyers = [], height = 'h-[25
         ))}
         {walkers.map((w, i) => (
           <div key={'w' + i} className={`vt-sprite vt-walker ${w.rtl ? 'vt-rtl' : ''}`} style={{ '--dur': w.dur || '50s', '--delay': w.delay || '-10s', width: `${(w.w / 14.4).toFixed(3)}%` }}>
-            <div className="vt-inner vt-step">{w.el}</div>
+            <div className="vt-inner vt-step"><div className={w.rtl ? 'vt-mirror' : undefined}>{w.el}</div></div>
           </div>
         ))}
         {flyers.map((f, i) => (
@@ -322,12 +359,15 @@ export default function Frieze({ className = '' }) {
             <div className={`vt-inner ${s.cls || ''}`}>{s.el}</div>
           </div>
         ))}
-        {/* walkers cross the quay */}
+        {/* walkers cross the quay in the front lane */}
         <div className="vt-sprite vt-walker" style={{ '--dur': '46s', '--delay': '-14s', width: '5.278%' }}>
           <div className="vt-inner vt-step flex items-end"><div className="w-[60%]"><Person coat={T.rust} trousers={T.slate} hat="cap" pose="walk" prop="trolley" /></div><div className="w-[40%] -ml-[6%]"><Trolley /></div></div>
         </div>
         <div className="vt-sprite vt-walker vt-rtl" style={{ '--dur': '58s', '--delay': '-40s', width: '3.194%' }}>
-          <div className="vt-inner vt-step"><Person coat={T.sage} hat="hard" pose="walk" prop="box" flip /></div>
+          <div className="vt-inner vt-step"><div className="vt-mirror"><Person coat={T.sage} hat="hard" pose="walk" prop="box" /></div></div>
+        </div>
+        <div className="vt-sprite vt-walker" style={{ '--dur': '70s', '--delay': '-55s', width: '3.194%' }}>
+          <div className="vt-inner vt-step"><Person coat={T.slate} hat="hair" pose="walk" /></div>
         </div>
         {/* gulls */}
         <div className="vt-sprite vt-flyer" style={{ top: '8%', '--dur': '48s', '--delay': '-20s', width: '3.056%' }}>

@@ -77,7 +77,12 @@
 .vt-stage { position: absolute; left: 50%; transform: translateX(-50%); width: max(100%, 980px); top: 0; bottom: 66px; container-type: inline-size; }
 .vt-sprite { position: absolute; bottom: 0; }
 .vt-inner { transform-origin: 50% 100%; }
-.vt-walker, .vt-flyer { left: 0; animation: vt-drift var(--dur) linear var(--delay) infinite; will-change: transform; z-index: 1; }
+.vt-walker, .vt-flyer { left: 0; animation: vt-drift var(--dur) linear var(--delay) infinite; will-change: transform; z-index: 2; }
+/* walkers use a front lane: a little lower and a little larger than the things standing on the quay */
+.vt-walker { bottom: -13px; }
+.vt-walker .vt-inner { transform-origin: 50% 100%; }
+.vt-mirror { transform: scaleX(-1); }
+.vt-sprite:not(.vt-walker):not(.vt-flyer) { z-index: 1; }
 .vt-flyer { bottom: auto; }
 .vt-rtl { animation-direction: reverse; }
 .vt-step { animation: vt-step .48s ease-in-out infinite alternate; }
@@ -107,3 +112,18 @@
 @media (prefers-reduced-motion: reduce) { .stagger > * { animation: none; } }
 .vt-bleed { width: 100vw; margin-left: calc(50% - 50vw); }
 html, body { overflow-x: clip; }
+
+/* walking, flapping, lifting, exhaust */
+.vt-leg { animation: vt-leg .48s ease-in-out infinite alternate; }
+.vt-leg-b { animation-delay: -.48s; }
+.vt-arm { animation: vt-arm .48s ease-in-out infinite alternate; }
+.vt-arm-b { animation-delay: -.48s; }
+@keyframes vt-leg { from { transform: rotate(-16deg); } to { transform: rotate(16deg); } }
+@keyframes vt-arm { from { transform: rotate(14deg); } to { transform: rotate(-14deg); } }
+.vt-wing { animation: vt-flap .42s ease-in-out infinite alternate; }
+@keyframes vt-flap { from { transform: scaleY(1); } to { transform: scaleY(-.55); } }
+.vt-lift { animation: vt-lift 4.5s ease-in-out infinite; }
+@keyframes vt-lift { 0%, 15%, 100% { transform: translateY(0); } 45%, 70% { transform: translateY(-14px); } }
+.vt-puff { animation: vt-puff 2.7s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes vt-puff { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate(10px, -26px) scale(2.2); } }
+@media (prefers-reduced-motion: reduce) { .vt-leg, .vt-arm, .vt-wing, .vt-lift, .vt-puff { animation: none; } }
