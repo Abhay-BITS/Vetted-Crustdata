@@ -51,10 +51,10 @@ export default function NewCheck() {
             </div>
             <div className="md:col-span-8 min-[1360px]:col-span-6 max-w-[620px]">
               <h1 className="h-hero enter enter-2">Vendor and carrier clearance, with a source for every fact</h1>
-              <p className="mt-[clamp(10px,1.6vh,16px)] body-lg enter enter-3">Give Vetted a vendor's name and website. It checks the company registry, staff, hiring and news, screens the directors and clears namesakes, then hands a person the decision and the evidence.</p>
+              <p className="mt-[clamp(10px,1.6vh,16px)] body-lg enter enter-3">Send us a new vendor's name and website. We check the company registry, staff, hiring and news, screen the directors and clear namesakes, then hand your team the decision and the evidence to approve.</p>
               <div className="mt-[clamp(18px,3vh,32px)] flex flex-wrap gap-2 enter enter-4">
                 <button className="btn-dark btn-lg" onClick={() => scrollToId('check')}>Check a vendor <ArrowDownRight size={18} aria-hidden="true" /></button>
-                <a className="btn-soft btn-lg" href="#/approvals">See the approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
+                <a className="btn-soft btn-lg" href="#/approvals">Review your approvals <ArrowDownRight size={18} aria-hidden="true" /></a>
               </div>
             </div>
             <div className="hidden min-[1360px]:flex min-[1360px]:col-span-3 justify-end items-start pt-1" aria-hidden="true">
@@ -66,16 +66,16 @@ export default function NewCheck() {
       </div>
 
       {/* the form */}
-      <Section id="check" className="mt-24 md:mt-32" lead="New check," leadRest="a name and a website are enough. Add a CIN, GSTIN or IFSC when you have them."
+      <Section id="check" className="mt-24 md:mt-32" lead="New check," leadRest="a name and a website are enough. Add a CIN, GSTIN or bank details when you have them."
                title="Check a new vendor"
-               body="The check usually takes 20 to 90 seconds. Nothing is sent and nothing is added to the vendor master until a person approves it.">
+               body="The check usually takes about a minute. Nothing is sent to the vendor and nothing is added to your vendor master until your team approves it.">
         <div className="panel mt-10 p-3 md:p-12 reveal">
           <div className="frame max-w-3xl mx-auto"><CheckForm /></div>
         </div>
       </Section>
 
-      {/* unit economics */}
-      {stats && <Economics stats={stats} />}
+      {/* the client's desk at a glance */}
+      {stats && <YourDesk stats={stats} />}
 
       {/* features */}
       <Section className="mt-24 md:mt-32" lead="Registry first," leadRest="then staff, hiring and news from Crustdata."
@@ -263,7 +263,7 @@ function CheckForm() {
         {err && <p role="alert" className="mt-4 text-sm text-bad">{err}</p>}
         <div className="sticky bottom-0 -mx-5 md:-mx-7 -mb-5 md:-mb-7 mt-6 px-5 md:px-7 py-4 bg-card border-t border-line rounded-b-xl flex flex-wrap items-center gap-3">
           <button className="btn-dark" disabled={busy}>{busy ? 'Starting' : 'Run the check'} <ArrowRight size={16} aria-hidden="true" /></button>
-          <span className="text-sm text-muted">Nothing is sent until a person approves it.</span>
+          <span className="text-sm text-muted">Nothing is sent until your team approves it.</span>
         </div>
       </div>
     </form>
@@ -291,46 +291,26 @@ function Field({ id, label, hint, span, mono, error, ...rest }) {
   )
 }
 
-function Economics({ stats }) {
-  const price = stats.price_per_vendor_inr || 0
-  const cost = stats.avg_cost_inr || 0
-  const margin = price ? Math.round(((price - cost) / price) * 100) : 0
+function YourDesk({ stats }) {
+  const d = stats.decisions || {}
+  const caught = (d.REFER || 0) + (d.REJECTED || 0) + (d.DUPLICATE_HELD || 0)
   return (
-    <Section className="mt-24 md:mt-32" lead="The numbers," leadRest="measured from the cost ledger of every check run here."
-             title="₹999 a vendor, about ₹30 to run"
-             body="The client pays a flat fee per vendor processed, whatever the outcome. The cost is what Crustdata credits and every other call actually add up to when nothing is cached.">
+    <Section className="mt-24 md:mt-32" lead="Your desk," leadRest="every vendor you have sent us, at a glance."
+             title="What Vetted has done for you"
+             body={`A flat ${inr(stats.price_per_vendor_inr)} per vendor, paid when the job is done, whatever the outcome. No setup, no seats.`}>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-10">
         {[
-          ['Price per vendor', inr(price), 'flat, paid when the job is done'],
-          ['Cost per check', inr(cost), 'measured, nothing cached'],
-          ['Gross margin', `${margin}%`, 'price minus measured cost'],
-          ['Time per check', stats.avg_seconds ? `${Math.round(stats.avg_seconds)}s` : '60–95s', stats.avg_seconds ? 'against days of manual checks' : 'measured on fresh checks, against days by hand'],
-        ].map(([k, v, d], i) => (
-          <div key={k} className="panel p-5 reveal" style={{ transitionDelay: `${i * 60}ms` }}>
+          ['Waiting for your approval', stats.pending_approvals, 'actions that cannot be undone', '#/approvals'],
+          ['Vendors cleared', d.CLEARED || 0, 'registered, trading, evidence on file', '#/checks'],
+          ['Risks caught', caught, 'lookalikes, duplicates, struck-off and bad bank details', '#/checks'],
+          ['Time per vendor', stats.avg_seconds ? `${Math.round(stats.avg_seconds)}s` : 'about a minute', 'instead of days of manual checks', '#/checks'],
+        ].map(([k, v, note, href], i) => (
+          <a key={k} href={href} className="panel p-5 reveal block transition hover:-translate-y-0.5" style={{ transitionDelay: `${i * 60}ms` }}>
             <p className="text-sm font-medium">{k}</p>
             <p className="text-[40px] leading-none font-medium tracking-tight mt-5 tabular-nums">{v}</p>
-            <p className="text-sm text-muted mt-3">{d}</p>
-          </div>
+            <p className="text-sm text-muted mt-3">{note}</p>
+          </a>
         ))}
-      </div>
-      <div className="panel mt-3 p-2 md:p-3 reveal">
-        <div className="frame overflow-x-auto" data-lenis-prevent>
-          <table className="w-full text-[15px]">
-            <thead className="text-left text-sm text-muted border-b border-line">
-              <tr>{['New vendors a month', 'Client pays', 'Our cost', 'Gross profit'].map(h => <th key={h} className="px-5 py-3.5 font-medium">{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {[25, 50, 200].map(n => (
-                <tr key={n} className="border-b border-line last:border-0">
-                  <td className="px-5 py-3.5 font-medium">{n}</td>
-                  <td className="px-5 py-3.5 mono">{inr(n * price)}</td>
-                  <td className="px-5 py-3.5 mono">{inr(Math.round(n * cost))}</td>
-                  <td className="px-5 py-3.5 mono">{inr(Math.round(n * (price - cost)))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </Section>
   )

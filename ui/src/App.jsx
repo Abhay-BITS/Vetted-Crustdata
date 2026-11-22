@@ -36,8 +36,8 @@ export default function App() {
   const [, route, arg] = hash.split('/')
   const nav = [
     { href: '#/approvals', key: 'approvals', label: 'Approvals', count: pending },
-    { href: '#/checks', key: 'checks', label: 'Checks' },
-    { href: '#/vendors', key: 'vendors', label: 'Vendor master', short: 'Vendors' },
+    { href: '#/checks', key: 'checks', label: 'Your checks', short: 'Checks' },
+    { href: '#/vendors', key: 'vendors', label: 'Your vendors', short: 'Vendors' },
   ]
   const active = route === 'run' || route === 'batch' ? 'checks' : route
 
@@ -76,7 +76,7 @@ export default function App() {
         <div className="wrap py-10 grid md:grid-cols-12 gap-8 items-end">
           <div className="md:col-span-4">
             <div className="flex items-center gap-2 mb-3"><Mark size={22} /><span className="font-medium">Vetted</span></div>
-            <p className="lead">Vendor and carrier clearance for a 3PL. Every fact links to the record it came from.</p>
+            <p className="lead">Vendor and carrier clearance, done for your desk. Every fact links to the record it came from.</p>
           </div>
           <div className="md:col-span-5 text-sm text-muted space-y-1">
             <p>Company data: Crustdata API · MCA company records · Razorpay IFSC directory</p>

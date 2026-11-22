@@ -9,6 +9,12 @@ ContextCon 05 · BITS Pilani · Track: **Trust and compliance** (5.1 The Vendor 
 
 ---
 
+## Who uses it
+
+The website is the **client's** workspace (the 3PL's vendor desk): onboarding staff run checks, approvers decide, the
+admin keeps the vendor master. The vendor never logs in; it only receives a clear email. Our own unit economics
+(cost per check, credits, margin) are deliberately **not** shown in the client's app; they are below and in the cost ledger.
+
 ## The job, and who pays for it today
 
 A mid-size 3PL adds new transporters, fleet owners, warehouse operators and suppliers every week. Before a vendor goes into
@@ -84,7 +90,8 @@ A fact whose value does not appear in its own quoted passage is dropped by the s
 
 Every check can be downloaded as an evidence file (`GET /api/runs/{id}/evidence`, Markdown) or printed as a PDF
 (`?fmt=html&print=1`): the decision, the four answers, every fact with its source, passage and dates, the personal data used,
-the approvals with approver and reason, restarts, and the full cost ledger. The run log is at `GET /api/runs/{id}/log`.
+the approvals with approver and reason, and restarts. It is written for the client and its auditors, so it carries no
+provider costs. For screening, the run log is at `GET /api/runs/{id}/log` and the cost ledger at `GET /api/runs/{id}/ledger`.
 
 ## Pass mark
 

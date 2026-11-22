@@ -4,7 +4,6 @@ import { api } from '../api'
 import ActionCard, { useApprover, ApproverPicker } from '../ActionCard'
 import { DecisionBadge, DECISIONS, inr } from '../ui'
 import { RunScene } from '../scenes'
-import { useCountUp } from '../motion'
 
 const STEP_LABEL = {
   intake: 'Read the request', duplicates: 'Check the vendor master', resolve: 'Find the company',
@@ -50,7 +49,7 @@ export default function RunView({ runId }) {
     { key: 'summary', label: 'Summary' },
     { key: 'facts', label: 'Facts', count: r?.facts?.length },
     { key: 'approvals', label: 'Approvals', count: run.actions?.length, alert: pending },
-    { key: 'data', label: 'Data and cost' },
+    { key: 'data', label: 'Evidence and privacy' },
   ]
 
   return (
@@ -81,13 +80,13 @@ export default function RunView({ runId }) {
             </ol>
           </div>
           <div className="panel p-5">
-            <h2 className="text-sm font-medium">Cost of this check</h2>
-            <CostFigure inr={cost.full_inr ?? cost.inr} />
-            <p className="text-xs text-muted mt-2">Full cost with nothing cached. Paid this time: {inr(cost.inr)}.</p>
+            <h2 className="text-sm font-medium">This check</h2>
+            <p className="text-[40px] leading-none font-medium tracking-tight mt-4 tabular-nums">{r?.seconds != null ? `${Math.round(r.seconds)}s` : running ? <span className="shimmer text-[28px]">Running</span> : '—'}</p>
+            <p className="text-xs text-muted mt-2">From request to decision. The same job usually takes days by hand.</p>
             <dl className="mt-4 grid grid-cols-2 gap-y-1.5 text-sm">
-              <dt className="text-muted">Crustdata credits</dt><dd className="text-right mono">{cost.full_credits ?? cost.credits ?? 0}</dd>
-              {r?.cost?.price_inr != null && <><dt className="text-muted">Price to client</dt><dd className="text-right mono">{inr(r.cost.price_inr)}</dd></>}
-              {r?.seconds != null && <><dt className="text-muted">Time</dt><dd className="text-right mono">{r.seconds}s</dd></>}
+              <dt className="text-muted">Facts with a source</dt><dd className="text-right mono">{r?.facts?.length ?? '—'}</dd>
+              <dt className="text-muted">Sources consulted</dt><dd className="text-right mono">{r ? new Set((r.facts || []).map(f => f.source.split(' (')[0].split(' /')[0])).size : '—'}</dd>
+              {r?.cost?.price_inr != null && <><dt className="text-muted">Billed for this vendor</dt><dd className="text-right mono">{inr(r.cost.price_inr)}</dd></>}
             </dl>
           </div>
         </aside>
@@ -125,7 +124,7 @@ export default function RunView({ runId }) {
                 {tab === 'summary' && <Summary r={r} req={req} onApprovals={() => setTab('approvals')} pending={pending} />}
                 {tab === 'facts' && <Facts r={r} />}
                 {tab === 'approvals' && <Approvals run={run} approver={approver} setApprover={setApprover} reload={load} />}
-                {tab === 'data' && <DataAndCost r={r} runId={runId} />}
+                {tab === 'data' && <EvidenceAndPrivacy r={r} runId={runId} />}
               </div>
             </>
           )}
@@ -293,18 +292,19 @@ function Approvals({ run, approver, setApprover, reload }) {
   )
 }
 
-/* ------------------------------------------------------------------ data and cost */
-function DataAndCost({ r, runId }) {
-  const [ledger, setLedger] = useState(null)
-  const [log, setLog] = useState(null)
+/* ------------------------------------------------------------------ evidence and privacy */
+function EvidenceAndPrivacy({ r, runId }) {
   const pd = r.personal_data
   return (
     <div className="pop space-y-3">
-      <div className="flex flex-wrap gap-2 mb-3">
-        <a className="btn-dark" href={`/api/runs/${runId}/evidence`}><FileDown size={16} aria-hidden="true" />Download evidence file</a>
-        <a className="btn-soft" href={`/api/runs/${runId}/evidence?fmt=html&print=1`} target="_blank" rel="noreferrer"><Printer size={16} aria-hidden="true" />Print as PDF</a>
+      <div className="panel p-5">
+        <h3 className="font-medium">Evidence file</h3>
+        <p className="text-sm text-muted mt-1">The decision, the four answers, every fact with its source and date, the personal data used, and who approved what. Ready for your auditors.</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <a className="btn-dark" href={`/api/runs/${runId}/evidence`}><FileDown size={16} aria-hidden="true" />Download evidence file</a>
+          <a className="btn-soft" href={`/api/runs/${runId}/evidence?fmt=html&print=1`} target="_blank" rel="noreferrer"><Printer size={16} aria-hidden="true" />Print as PDF</a>
+        </div>
       </div>
-
       {pd && (
         <Collapsible title="Personal data used" badge={`${pd.people?.length || 0} people · deleted after ${pd.retention_days} days`} defaultOpen>
           <p className="text-sm text-muted mb-3 px-2">Only what the job needs, from public company records. Not collected: {pd.not_collected}.</p>
@@ -320,40 +320,6 @@ function DataAndCost({ r, runId }) {
           ) : <p className="text-sm text-muted px-2">No personal data was used for this check.</p>}
         </Collapsible>
       )}
-
-      <Collapsible title="Cost ledger" badge={`${r.cost?.calls ?? 0} calls · ${inr(r.cost?.full_inr ?? r.cost?.inr)}`} onOpen={() => !ledger && api.ledger(runId).then(setLedger)}>
-        {!ledger ? <p className="text-sm text-muted flex items-center gap-2 px-2"><Loader2 size={14} className="animate-spin" />Loading</p> : (
-          <div className="frame overflow-auto max-h-96" data-lenis-prevent>
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted border-b border-line sticky top-0 bg-card"><tr>{['Step', 'Provider', 'Endpoint', 'Result', 'Credits', '₹'].map(h => <th key={h} className="px-4 py-2.5 font-medium">{h}</th>)}</tr></thead>
-              <tbody>
-                {ledger.calls.map(c => (
-                  <tr key={c.id} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2">{c.step}</td><td className="px-4 py-2">{c.provider}</td>
-                    <td className="px-4 py-2 mono max-w-[220px] truncate" title={c.endpoint}>{c.endpoint}</td>
-                    <td className="px-4 py-2">{c.outcome}</td><td className="px-4 py-2 mono">{c.list_credits ?? c.credits}</td><td className="px-4 py-2 mono">{c.list_inr ?? c.inr}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Collapsible>
-
-      <Collapsible title="Run log" badge="every step and call" onOpen={() => !log && api.log(runId).then(setLog)}>
-        {!log ? <p className="text-sm text-muted flex items-center gap-2 px-2"><Loader2 size={14} className="animate-spin" />Loading</p> : (
-          <div className="frame p-4 max-h-80 overflow-auto" data-lenis-prevent>
-            <ol className="mono text-[12px] space-y-1">
-              {log.lines.map((l, i) => (
-                <li key={i} className="grid grid-cols-[72px_90px_1fr] gap-3">
-                  <span className="text-muted">{(l.ts || '').slice(11)}</span><span>{l.step}</span>
-                  <span className="truncate" title={JSON.stringify(l)}>{l.event}{l.reason ? `: ${l.reason}` : ''}{l.seconds != null ? ` (${l.seconds}s)` : ''}{l.wait_s ? ` wait ${l.wait_s}s` : ''}{l.endpoint ? ` ${l.endpoint}` : ''}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </Collapsible>
     </div>
   )
 }
@@ -387,7 +353,3 @@ function List({ title, items }) {
   )
 }
 
-function CostFigure({ inr: value }) {
-  const v = useCountUp(value || 0, 700)
-  return <p className="text-[40px] leading-none font-medium tracking-tight mt-4 tabular-nums">{inr(Math.round(v * 100) / 100)}</p>
-}

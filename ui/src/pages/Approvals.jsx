@@ -34,9 +34,9 @@ export default function Approvals() {
   useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t) }, [])
 
   return (
-    <Section enter titleAs="h1" lead="Approvals," leadRest="the only part a person has to do."
-             title="Actions waiting for a person"
-             body="Nothing that cannot be undone happens on its own. Each action shows what Vetted found, what it plans to do and why, and runs once even if the service restarts.">
+    <Section enter titleAs="h1" lead="Your approvals," leadRest="the only part your team has to do."
+             title="Actions waiting for you"
+             body="Nothing that cannot be undone happens without your say. Each action shows what we found, what we plan to do and why, and runs exactly once.">
       <div className="vt-bleed mt-10 enter enter-5"><ApprovalsScene /></div>
       <div className="md:grid md:grid-cols-12 gap-x-8 mt-12">
         <div className="md:col-start-5 md:col-span-8">

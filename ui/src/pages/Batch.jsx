@@ -41,7 +41,6 @@ export default function Batch({ batchId }) {
                 {r.answers && (
                   <p className="text-sm text-muted mt-3">{r.answers.real_and_trading} · {r.answers.how_long_it_has_existed} · {(r.answers.anything_off || []).slice(0, 1).join('')}</p>
                 )}
-                {r.cost && <p className="mono text-muted mt-2">{inr(r.cost.full_inr ?? r.cost.inr)} full cost</p>}
               </a>
             ))}
           </div>

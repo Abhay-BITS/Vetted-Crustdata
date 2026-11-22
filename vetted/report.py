@@ -62,6 +62,5 @@ def to_markdown(r: dict) -> str:
     for f in r.get("facts", []):
         lines.append(f"- **{f['field']}**: {f['citation']}  \n  > {f['passage'][:240]}")
     c = r["cost"]
-    lines += ["", f"_Cost: {c['credits']} credits, {c['tokens']} LLM tokens, Rs {c['inr']} "
-                  f"({c['calls']} calls, {c['cached_calls']} cached). Time: {r['seconds']}s._"]
+    lines += ["", f"_Completed in {r['seconds']}s · {len(r.get('facts', []))} facts with a source · billed Rs {c.get('price_inr')}._"]
     return "\n".join(lines)

@@ -28,9 +28,6 @@ def evidence_markdown(rec: dict, actions: list[dict], ledger: list[dict]) -> str
     ev = r.get("events") or []
     if ev:
         out += ["", "## Restarts"] + [f"- {_ts(e['ts'])}: resumed from step {e.get('from_step')} with {e.get('completed_steps')} steps saved" for e in ev]
-    out += ["", "## Cost ledger", "", "| Step | Provider | Endpoint | Result | Credits | Rs | ms |", "|---|---|---|---|---|---|---|"]
-    for c in ledger:
-        out.append(f"| {c['step']} | {c['provider']} | {c['endpoint'][:80]} | {c['outcome']} | {c['credits']} | {c['inr']} | {c.get('duration_ms') or ''} |")
     return "\n".join(out) + "\n"
 
 
@@ -65,5 +62,5 @@ small{{color:#777}} @media print{{a{{color:#2b2b2b}}}}</style></head><body>
 <h2>Facts and their sources</h2><table>{facts}</table>
 <h2>Personal data used</h2><ul>{people}</ul>
 <h2>Approvals and actions</h2><table><tr><th>Action</th><th>Status</th><th>Approver</th><th>Reason</th><th>Executed</th><th>At</th></tr>{acts or '<tr><td colspan=6>None</td></tr>'}</table>
-<h2>Cost</h2><p>{c.get('full_credits', c.get('credits'))} Crustdata credits, Rs {c.get('full_inr', c.get('inr'))} full cost · {c.get('calls')} calls · {r.get('seconds')} s · price to client Rs {c.get('price_inr')}</p>
+<h2>This check</h2><p>Completed in {r.get('seconds')} s · {len(r.get('facts') or [])} facts with a source · billed Rs {c.get('price_inr')}</p>
 <script>if(location.search.includes('print'))window.print()</script></body></html>"""

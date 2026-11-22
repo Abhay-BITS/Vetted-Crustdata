@@ -19,9 +19,9 @@ export default function Vendors() {
   }
 
   return (
-    <Section enter titleAs="h1" lead="Client records," leadRest="the vendors the client already pays."
-             title="Vendor master"
-             body="Every new check is compared against this list for duplicates and shared bank accounts. Approved vendors are added here once.">
+    <Section enter titleAs="h1" lead="Your vendor master," leadRest="the vendors you already pay."
+             title="Your vendors"
+             body="Every new check is compared with this list for duplicates and shared bank accounts. Vendors you approve are added here, once.">
       <div className="vt-bleed mt-10 enter enter-4"><VendorsScene /></div>
       <div className="md:grid md:grid-cols-12 gap-x-8 mt-12">
         <div className="md:col-start-5 md:col-span-8 flex flex-wrap items-center gap-3 enter enter-4">
