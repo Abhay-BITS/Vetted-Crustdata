@@ -86,6 +86,27 @@ Every fact carries its **source link, the exact passage or API field, the record
 
 A fact whose value does not appear in its own quoted passage is dropped by the source check and cannot support a decision.
 
+## Plans and payments
+
+Plans live in `policy.yaml` (Pay as you go ₹999 per vendor · Growth ₹19,999/month with 30 checks and re-screening of
+200 vendors · Scale ₹59,999/month with 120 checks and 1,000 monitored vendors). The **Billing** page shows the plan, this
+month's checks and the invoice preview; **Checkout** takes payment in **test mode only**:
+
+- with `RAZORPAY_KEY_ID` (`rzp_test_...`) and `RAZORPAY_KEY_SECRET` set, it creates a Razorpay order and opens Razorpay
+  Checkout; the payment signature is verified on the server before the plan changes;
+- without keys it runs a clearly labelled **simulated test payment** (no provider, no card, no money).
+
+Each order is paid exactly once: a repeated confirmation returns "already paid" and changes nothing.
+
+## Next: many 3PLs on one service (designed, not built in this event)
+
+- a `companies` table with every run, action, vendor and setting scoped to one company, so no client sees another's data;
+- sign-up and log-in with roles (admin, approver, analyst) replacing approver PINs;
+- emails sent in each client's name, per-client policy, approvers and vendor master;
+- usage metered and invoiced per company; API keys so a client's ERP can send vendors;
+- an operator console (all companies, usage, our cost per check and margin) for Vetted staff only;
+- Postgres instead of SQLite for hosting with a lasting database.
+
 ## Evidence file
 
 Every check can be downloaded as an evidence file (`GET /api/runs/{id}/evidence`, Markdown) or printed as a PDF

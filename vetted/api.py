@@ -8,6 +8,7 @@ which reconciles anything a crash left half-done before running newly approved a
 from __future__ import annotations
 
 import csv
+import httpx
 import io
 import json
 import threading
@@ -294,6 +295,47 @@ def import_vendor_master_csv(st: Store, text: str) -> int:
               row.get("status") or "active", time.time()))
         n += 1
     return n
+
+
+# --------------------------------------------------------------------------- plans and billing
+class CheckoutReq(BaseModel):
+    plan: str
+
+
+class ConfirmReq(BaseModel):
+    order_id: str
+    payment_id: str | None = None
+    signature: str | None = None
+
+
+@app.get("/api/plans")
+def get_plans():
+    from . import billing
+    return {"plans": billing.plans(), "mode": billing.mode()}
+
+
+@app.get("/api/billing")
+def get_billing():
+    from . import billing
+    return {**billing.usage(store), "mode": billing.mode(), "history": billing.history(store)}
+
+
+@app.post("/api/billing/checkout")
+def checkout(req: CheckoutReq):
+    from . import billing
+    try:
+        return billing.create_checkout(store, req.plan)
+    except (ValueError, httpx.HTTPError) as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/billing/confirm")
+def confirm_payment(req: ConfirmReq):
+    from . import billing
+    try:
+        return billing.confirm(store, req.order_id, req.payment_id, req.signature)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/summary")

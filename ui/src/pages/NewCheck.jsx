@@ -5,6 +5,7 @@ import Frieze from '../Frieze'
 import { Checklist, Scanner, Sky } from '../HeroArt'
 import { useReveal, scrollToId } from '../motion'
 import { check, isWarning } from '../validate'
+import { PlanCards } from './Billing'
 import { DecisionBadge, DECISIONS, Section, inr } from '../ui'
 
 const EMPTY = {
@@ -76,6 +77,13 @@ export default function NewCheck() {
 
       {/* the client's desk at a glance */}
       {stats && <YourDesk stats={stats} />}
+
+      {/* plans */}
+      <Section id="pricing" className="mt-24 md:mt-32" lead="Plans," leadRest="pay per vendor, or a monthly plan with re-screening."
+               title="Simple pricing for vendor desks"
+               body="Every plan includes the full check, the evidence file, approvals and the audit trail. You pay for finished checks only, whatever the outcome.">
+        <div className="mt-10"><PlanCards /></div>
+      </Section>
 
       {/* features */}
       <Section className="mt-24 md:mt-32" lead="Registry first," leadRest="then staff, hiring and news from Crustdata."

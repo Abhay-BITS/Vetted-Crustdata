@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS events (
     kind TEXT NOT NULL,
     data_json TEXT
 );
+CREATE TABLE IF NOT EXISTS account (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+CREATE TABLE IF NOT EXISTS billing_orders (       -- one row per checkout; paid exactly once
+    order_id TEXT PRIMARY KEY,
+    plan TEXT NOT NULL,
+    amount_inr REAL NOT NULL,
+    provider TEXT NOT NULL,                       -- razorpay_test | simulated_test
+    status TEXT NOT NULL,                         -- created | paid
+    payment_id TEXT,
+    created_at REAL NOT NULL,
+    paid_at REAL
+);
 CREATE TABLE IF NOT EXISTS vendor_master (
     vendor_id TEXT PRIMARY KEY,
     legal_name TEXT,

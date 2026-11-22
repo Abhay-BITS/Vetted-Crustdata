@@ -26,4 +26,8 @@ export const api = {
   },
   summary: () => req('/api/summary'),
   batch: (id) => req(`/api/batches/${id}`),
+  plans: () => req('/api/plans'),
+  billing: () => req('/api/billing'),
+  checkout: (plan) => req('/api/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+  confirm: (body) => req('/api/billing/confirm', { method: 'POST', body: JSON.stringify(body) }),
 }

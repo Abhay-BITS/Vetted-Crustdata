@@ -8,6 +8,7 @@ import Approvals from './pages/Approvals'
 import Checks from './pages/Checks'
 import Vendors from './pages/Vendors'
 import Batch from './pages/Batch'
+import Billing, { Checkout } from './pages/Billing'
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash || '#/')
@@ -38,12 +39,15 @@ export default function App() {
     { href: '#/approvals', key: 'approvals', label: 'Approvals', count: pending },
     { href: '#/checks', key: 'checks', label: 'Your checks', short: 'Checks' },
     { href: '#/vendors', key: 'vendors', label: 'Your vendors', short: 'Vendors' },
+    { href: '#/billing', key: 'billing', label: 'Billing' },
   ]
-  const active = route === 'run' || route === 'batch' ? 'checks' : route
+  const active = route === 'run' || route === 'batch' ? 'checks' : route === 'checkout' ? 'billing' : route
 
   let page
   if (route === 'run' && arg) page = <RunView key={arg} runId={arg} />
   else if (route === 'batch' && arg) page = <Batch key={arg} batchId={arg} />
+  else if (route === 'billing') page = <Billing />
+  else if (route === 'checkout' && arg) page = <Checkout key={arg} planId={arg} />
   else if (route === 'approvals') page = <Approvals />
   else if (route === 'checks') page = <Checks />
   else if (route === 'vendors') page = <Vendors />

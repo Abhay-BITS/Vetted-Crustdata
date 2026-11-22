@@ -47,6 +47,11 @@ output:
   # extra fields can be appended here without code changes
   fields: ["decision", "real_and_trading", "who_runs_it", "how_long_it_has_existed", "anything_off", "facts", "cost", "missing", "personal_data"]
 
+plans:
+  - {id: payg, name: "Pay as you go", monthly_inr: 0, included_checks: 0, extra_check_inr: 999, monitored_vendors: 0, note: "No commitment. Pay per vendor checked."}
+  - {id: growth, name: "Growth", monthly_inr: 19999, included_checks: 30, extra_check_inr: 599, monitored_vendors: 200, note: "For a mid-size 3PL. Monthly re-screening of active vendors."}
+  - {id: scale, name: "Scale", monthly_inr: 59999, included_checks: 120, extra_check_inr: 499, monitored_vendors: 1000, note: "For aggregators and large 3PLs. API access for your ERP."}
+
 email:
   # agents only write to the team: anything else is saved as a file, never sent
   allow_domains: ["pilani.bits-pilani.ac.in"]
